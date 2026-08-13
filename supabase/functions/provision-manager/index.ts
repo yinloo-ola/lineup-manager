@@ -29,21 +29,26 @@ Deno.serve(async (req: Request): Promise<Response> => {
     { auth: { persistSession: false } },
   );
 
-  // Authorise: the caller must be an admin. supabase-js forwards the user's
-  // access token in the Authorization header when invoking functions.
+  // Authorise: the caller must be an admin. We forward the caller's access
+  // token to a caller-authenticated client and call is_admin() — PostgREST
+  // validates the JWT signature and is_admin() reads the email claim, exactly
+  // as the RLS policies do. (auth.getUser(token) on a service-role client is
+  // unreliable for caller identity, so we don't use it here.)
   const authHeader = req.headers.get("Authorization") ?? "";
   const token = authHeader.replace(/^Bearer\s+/i, "");
-  const {
-    data: { user },
-  } = await admin.auth.getUser(token);
-  const callerEmail = user?.email;
-  if (!callerEmail) return json({ error: "Unauthorized" }, 401);
-  const { data: adminRow } = await admin
-    .from("app_admins")
-    .select("email")
-    .eq("email", callerEmail)
-    .maybeSingle();
-  if (!adminRow) return json({ error: "Forbidden: administrators only" }, 403);
+  if (!token) return json({ error: "Unauthorized" }, 401);
+  const caller = createClient(
+    Deno.env.get("SUPABASE_URL")!,
+    Deno.env.get("SUPABASE_ANON_KEY") ?? "",
+    {
+      global: { headers: { Authorization: `Bearer ${token}` } },
+      auth: { persistSession: false },
+    },
+  );
+  const { data: isAdmin, error: adminErr } = await caller.rpc("is_admin");
+  if (adminErr || !isAdmin) {
+    return json({ error: "Forbidden: administrators only" }, 403);
+  }
 
   // Validate input.
   const body = await req.json().catch(() => null);
