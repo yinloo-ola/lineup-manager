@@ -5,7 +5,6 @@ import { useAuthStore } from '@/stores/auth'
 import { supabase } from '@/lib/supabase'
 import {
   fetchLineupBuilderData,
-  recallLineup,
   saveLineupDraft,
   submitLineup,
   type LineupBuilderData
@@ -13,11 +12,12 @@ import {
 import {
   canSubmit,
   isLineupComplete,
+  lineupViolations,
   removePlayer,
   tryAssign,
   type CanSubmitResult
 } from '@/domain/lineupBuilder'
-import { expectedSlots, findDoubleBookings, validateLineup } from '@/domain/validate'
+import { expectedSlots } from '@/domain/validate'
 import type { Lineup, Rubber, Violation } from '@/domain/types'
 
 const route = useRoute()
@@ -58,9 +58,14 @@ const issues = computed<Violation[]>(() => {
   const d = data.value
   const w = working.value
   if (!d || !w) return []
-  const within = validateLineup(d.tieFormat, d.tie, w, d.roster, { asOf: d.asOf })
-  const across = findDoubleBookings([d.tie, ...d.teamTies], [w, ...d.teamLineups])
-  return [...within, ...across].filter((v) => v.kind !== 'incomplete-rubber')
+  return lineupViolations(w, {
+    tieFormat: d.tieFormat,
+    tie: d.tie,
+    roster: d.roster,
+    asOf: d.asOf,
+    teamTies: d.teamTies,
+    teamLineups: d.teamLineups
+  }).filter((v) => v.kind !== 'incomplete-rubber')
 })
 const rubberIssues = computed<Violation[][]>(() => {
   const byRubber: Violation[][] = []
@@ -194,7 +199,7 @@ async function onRecall(): Promise<void> {
   busy.value = true
   feedback.value = null
   try {
-    await recallLineup(supabase, w)
+    await saveLineupDraft(supabase, w)
     await load()
     feedback.value = { kind: 'success', text: 'Lineup recalled to draft.' }
   } catch (e) {
@@ -345,6 +350,7 @@ onMounted(load)
               </v-alert>
 
               <v-btn
+                v-if="working.status !== 'submitted'"
                 color="primary"
                 block
                 size="large"

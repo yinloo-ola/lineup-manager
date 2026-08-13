@@ -5,7 +5,27 @@
 // freely as drafts. Pure: no UI, no network.
 
 import { expectedSlots, findDoubleBookings, validateLineup } from './validate'
-import type { Lineup, Player, Tie, TieFormat } from './types'
+import type { Lineup, Player, Tie, TieFormat, Violation } from './types'
+
+/** Shared context for validating a lineup against its tie + team fixtures. */
+export interface LineupViolationsContext {
+  tieFormat: TieFormat
+  tie: Tie
+  roster: Player[]
+  asOf: string
+  /** The team's other ties + their current lineups, for cross-slot clash checks.
+   *  Should NOT include the tie being validated (it is represented by `lineup`). */
+  teamTies: Tie[]
+  teamLineups: Lineup[]
+}
+
+/** All violations for a lineup: within-tie (eligibility/pair/usage/completeness) + cross-slot. */
+export function lineupViolations(lineup: Lineup, ctx: LineupViolationsContext): Violation[] {
+  const within = validateLineup(ctx.tieFormat, ctx.tie, lineup, ctx.roster, { asOf: ctx.asOf })
+  const otherLineups = ctx.teamLineups.filter((l) => l.tieId !== ctx.tie.id)
+  const across = findDoubleBookings([ctx.tie, ...ctx.teamTies], [lineup, ...otherLineups])
+  return [...within, ...across]
+}
 
 export interface TryAssignArgs {
   tieFormat: TieFormat
@@ -50,12 +70,7 @@ export function tryAssign(args: TryAssignArgs): TryAssignResult {
     )
   }
 
-  const within = validateLineup(tieFormat, tie, candidate, roster, { asOf })
-  // Exclude any stale lineup for the tie being edited (represented by `candidate`).
-  const otherLineups = teamLineups.filter((l) => l.tieId !== tie.id)
-  const across = findDoubleBookings([tie, ...teamTies], [candidate, ...otherLineups])
-
-  const blocking = [...within, ...across].find((v) => {
+  const blocking = lineupViolations(candidate, { tieFormat, tie, roster, asOf, teamTies, teamLineups }).find((v) => {
     if (v.kind === 'incomplete-rubber') return false // partial drafts are allowed
     if (v.rubberIndex === rubberIndex) return true
     return !!v.playerIds?.includes(playerId)
@@ -110,10 +125,7 @@ export function canSubmit(args: CanSubmitArgs): CanSubmitResult {
   if (!isLineupComplete(tieFormat, lineup)) {
     return { ok: false, reasons: ['Lineup is not complete — every rubber must be filled.'] }
   }
-  const within = validateLineup(tieFormat, tie, lineup, roster, { asOf })
-  const otherLineups = teamLineups.filter((l) => l.tieId !== tie.id)
-  const across = findDoubleBookings([tie, ...teamTies], [lineup, ...otherLineups])
-  const violations = [...within, ...across]
+  const violations = lineupViolations(lineup, { tieFormat, tie, roster, asOf, teamTies, teamLineups })
   if (violations.length) {
     return { ok: false, reasons: violations.map((v) => v.message) }
   }

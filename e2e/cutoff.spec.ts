@@ -1,5 +1,10 @@
 import { test, expect } from '@playwright/test'
-import { TEST_MANAGER2_EMAIL, TEST_MANAGER2_NEW_PASSWORD } from './global-setup'
+import {
+  TEST_ADMIN_EMAIL,
+  TEST_ADMIN_PASSWORD,
+  TEST_MANAGER2_EMAIL,
+  TEST_MANAGER2_NEW_PASSWORD
+} from './global-setup'
 
 // Verifies the SERVER-SIDE cutoff enforcement from migration 0007: a client
 // clock can be bypassed, so the database itself must refuse manager writes at/after
@@ -33,4 +38,26 @@ test('server refuses manager lineup writes at/after the cutoff', async ({ reques
     data: { tie_id: 'e2e-tie-past', team_id: 'e2e-b', player_ids: [['e2e-p3']], status: 'draft' }
   })
   expect(res.ok()).toBeFalsy()
+})
+
+test('admin may still edit after the cutoff (no-reopen: admin-only)', async ({ request }) => {
+  // The other half of no-reopen: managers are blocked, but admins keep access.
+  const signIn = await request.post(`${url}/auth/v1/token?grant_type=password`, {
+    headers: { apikey: anonKey, 'Content-Type': 'application/json' },
+    data: { email: TEST_ADMIN_EMAIL, password: TEST_ADMIN_PASSWORD }
+  })
+  expect(signIn.ok()).toBeTruthy()
+  const { access_token } = (await signIn.json()) as { access_token: string }
+  const headers = {
+    apikey: anonKey,
+    Authorization: `Bearer ${access_token}`,
+    'Content-Type': 'application/json',
+    Prefer: 'return=minimal'
+  }
+
+  const res = await request.post(`${url}/rest/v1/lineups`, {
+    headers,
+    data: { tie_id: 'e2e-tie-past', team_id: 'e2e-b', player_ids: [['e2e-p3']], status: 'submitted' }
+  })
+  expect(res.ok()).toBeTruthy()
 })
