@@ -14,7 +14,8 @@ test.describe('authentication', () => {
     await page.getByRole('button', { name: /sign in/i }).click()
 
     await expect(page).toHaveURL(/\/$/)
-    await expect(page.getByRole('heading', { name: /administrator home/i })).toBeVisible()
+    // The Sign out button only renders on the authenticated home page.
+    await expect(page.getByRole('button', { name: /sign out/i })).toBeVisible()
   })
 
   test('sign out returns to the login page', async ({ page }) => {

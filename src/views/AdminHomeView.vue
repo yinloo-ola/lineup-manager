@@ -1,12 +1,16 @@
 <script setup lang="ts">
 import { computed } from 'vue'
+import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 
 const auth = useAuthStore()
+const router = useRouter()
 const email = computed(() => auth.user?.email ?? '')
 
 async function signOut() {
   await auth.signOut()
+  // No guard fires without a navigation, so push explicitly to /login.
+  router.push({ name: 'login' })
 }
 </script>
 
