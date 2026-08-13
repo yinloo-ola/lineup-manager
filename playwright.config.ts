@@ -22,9 +22,11 @@ export default defineConfig({
     }
   ],
   webServer: {
-    command: 'npm run dev',
+    // Bind the dev server explicitly to IPv4 so the URL poll below reaches it
+    // (Vite's default `localhost` can bind ::1, leaving 127.0.0.1 unreachable).
+    command: 'npm run dev -- --host 127.0.0.1 --strictPort',
     url: 'http://127.0.0.1:5173',
     reuseExistingServer: !process.env.CI,
-    timeout: 120_000
+    timeout: 180_000
   }
 })
