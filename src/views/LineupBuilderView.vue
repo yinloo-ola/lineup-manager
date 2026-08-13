@@ -3,8 +3,20 @@ import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { supabase } from '@/lib/supabase'
-import { fetchLineupBuilderData, saveLineupDraft, type LineupBuilderData } from '@/services/lineupService'
-import { isLineupComplete, removePlayer, tryAssign } from '@/domain/lineupBuilder'
+import {
+  fetchLineupBuilderData,
+  recallLineup,
+  saveLineupDraft,
+  submitLineup,
+  type LineupBuilderData
+} from '@/services/lineupService'
+import {
+  canSubmit,
+  isLineupComplete,
+  removePlayer,
+  tryAssign,
+  type CanSubmitResult
+} from '@/domain/lineupBuilder'
 import { expectedSlots, findDoubleBookings, validateLineup } from '@/domain/validate'
 import type { Lineup, Rubber, Violation } from '@/domain/types'
 
@@ -64,6 +76,23 @@ const complete = computed(() => {
   const w = working.value
   return !!(d && w && isLineupComplete(d.tieFormat, w))
 })
+// Submit requires a complete + valid lineup (canSubmit). Re-evaluated as the
+// working lineup changes; the server re-checks the cutoff on write.
+const submitCheck = computed<CanSubmitResult>(() => {
+  const d = data.value
+  const w = working.value
+  if (!d || !w) return { ok: false, reasons: ['No lineup loaded.'] }
+  return canSubmit({
+    tieFormat: d.tieFormat,
+    tie: d.tie,
+    roster: d.roster,
+    asOf: d.asOf,
+    lineup: w,
+    teamTies: d.teamTies,
+    teamLineups: d.teamLineups
+  })
+})
+const submittable = computed(() => submitCheck.value.ok && !data.value?.locked)
 
 function rubberSummary(rubber: Rubber): string {
   const parts: string[] = [rubber.format === 'singles' ? 'Singles' : 'Doubles']
@@ -128,7 +157,46 @@ async function onSave(): Promise<void> {
   feedback.value = null
   try {
     await saveLineupDraft(supabase, w)
+    await load()
     feedback.value = { kind: 'success', text: 'Draft saved.' }
+  } catch (e) {
+    feedback.value = { kind: 'error', text: (e as Error).message }
+  } finally {
+    busy.value = false
+  }
+}
+
+async function onSubmit(): Promise<void> {
+  const d = data.value
+  const w = working.value
+  if (!d || !w || d.locked) return
+  if (!submitCheck.value.ok) {
+    feedback.value = { kind: 'error', text: submitCheck.value.reasons.join(' ') }
+    return
+  }
+  busy.value = true
+  feedback.value = null
+  try {
+    await submitLineup(supabase, w)
+    await load()
+    feedback.value = { kind: 'success', text: 'Lineup submitted.' }
+  } catch (e) {
+    feedback.value = { kind: 'error', text: (e as Error).message }
+  } finally {
+    busy.value = false
+  }
+}
+
+async function onRecall(): Promise<void> {
+  const d = data.value
+  const w = working.value
+  if (!d || !w || d.locked) return
+  busy.value = true
+  feedback.value = null
+  try {
+    await recallLineup(supabase, w)
+    await load()
+    feedback.value = { kind: 'success', text: 'Lineup recalled to draft.' }
   } catch (e) {
     feedback.value = { kind: 'error', text: (e as Error).message }
   } finally {
@@ -245,10 +313,15 @@ onMounted(load)
               </v-card-subtitle>
             </v-card-item>
             <v-card-text>
-              <v-chip :color="complete ? 'green' : 'amber'" variant="tonal" class="mr-2">
-                {{ complete ? 'complete' : 'draft' }}
+              <v-chip :color="working.status === 'submitted' ? 'green' : complete ? 'green' : 'amber'" variant="tonal" class="mr-2">
+                {{ working.status }}
               </v-chip>
-              <v-chip color="grey" variant="tonal">{{ data.lineup.status }}</v-chip>
+              <v-chip v-if="working.status !== 'submitted'" :color="complete ? 'green' : 'amber'" variant="tonal">
+                {{ complete ? 'complete' : 'incomplete' }}
+              </v-chip>
+              <p v-if="working.submittedAt" class="text-body-2 text-medium-emphasis mt-2">
+                Submitted {{ fmt(working.submittedAt) }}
+              </p>
 
               <v-alert
                 v-for="(v, vi) in globalIssues"
@@ -281,6 +354,31 @@ onMounted(load)
                 @click="onSave"
               >
                 Save draft
+              </v-btn>
+              <v-btn
+                v-if="working.status !== 'submitted'"
+                block
+                size="large"
+                variant="outlined"
+                color="primary"
+                class="mt-2"
+                :loading="busy"
+                :disabled="!submittable"
+                @click="onSubmit"
+              >
+                Submit
+              </v-btn>
+              <v-btn
+                v-if="working.status === 'submitted'"
+                block
+                size="large"
+                variant="outlined"
+                class="mt-2"
+                :loading="busy"
+                :disabled="data.locked"
+                @click="onRecall"
+              >
+                Recall to draft
               </v-btn>
             </v-card-text>
           </v-card>

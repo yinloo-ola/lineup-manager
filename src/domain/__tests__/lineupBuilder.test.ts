@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { tryAssign, removePlayer, isLineupComplete, emptyLineupFor } from '../lineupBuilder'
+import { canSubmit, tryAssign, removePlayer, isLineupComplete, emptyLineupFor } from '../lineupBuilder'
 import type { Lineup, Player, Tie, TieFormat } from '../types'
 
 const AS_OF = '2026-01-01'
@@ -227,6 +227,76 @@ describe('removePlayer', () => {
   it('removes one player from a doubles pair, leaving a partial', () => {
     const after = removePlayer(lineupOf(['p1', 'p2']), 0, 'p1')
     expect(after.playerIds[0]).toEqual(['p2'])
+  })
+})
+
+describe('canSubmit', () => {
+  const mensSingles: TieFormat = {
+    rubbers: [{ format: 'singles', constraint: { allowedGenders: ['M'] } }]
+  }
+
+  it('accepts a complete, valid lineup', () => {
+    const r = canSubmit({
+      tieFormat: mensSingles,
+      tie,
+      roster: [player('p1', 'M', '1990-01-01')],
+      asOf: AS_OF,
+      lineup: lineupOf(['p1']),
+      teamTies: [],
+      teamLineups: []
+    })
+    expect(r.ok).toBe(true)
+  })
+
+  it('rejects an incomplete lineup', () => {
+    const r = canSubmit({
+      tieFormat: mensSingles,
+      tie,
+      roster: [player('p1', 'M', '1990-01-01')],
+      asOf: AS_OF,
+      lineup: emptyLineupFor(mensSingles, 't1', 'A'),
+      teamTies: [],
+      teamLineups: []
+    })
+    expect(r.ok).toBe(false)
+    if (!r.ok) expect(r.reasons.join(' ')).toMatch(/complete/i)
+  })
+
+  it('rejects a complete lineup with an illegal assignment', () => {
+    // men's singles fielding a woman
+    const r = canSubmit({
+      tieFormat: mensSingles,
+      tie,
+      roster: [player('p1', 'F', '1990-01-01')],
+      asOf: AS_OF,
+      lineup: lineupOf(['p1']),
+      teamTies: [],
+      teamLineups: []
+    })
+    expect(r.ok).toBe(false)
+    if (!r.ok) expect(r.reasons.join(' ')).toMatch(/gender/i)
+  })
+
+  it('rejects a complete lineup that cross-slot double-books', () => {
+    const sameSlotTie: Tie = { id: 't2', scheduledStart: tie.scheduledStart, teamIds: ['A', 'C'] }
+    const other: Lineup = {
+      tieId: 't2',
+      teamId: 'A',
+      playerIds: [['p1']],
+      status: 'draft',
+      updatedAt: '2026-01-01T00:00'
+    }
+    const r = canSubmit({
+      tieFormat: mensSingles,
+      tie,
+      roster: [player('p1', 'M', '1990-01-01')],
+      asOf: AS_OF,
+      lineup: lineupOf(['p1']),
+      teamTies: [sameSlotTie],
+      teamLineups: [other]
+    })
+    expect(r.ok).toBe(false)
+    if (!r.ok) expect(r.reasons.join(' ')).toMatch(/double|slot|tie/i)
   })
 })
 

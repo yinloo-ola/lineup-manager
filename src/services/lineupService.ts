@@ -185,8 +185,45 @@ export async function fetchLineupBuilderData(
   }
 }
 
-/** Persist a lineup as a draft (RLS: own team only). */
+/** Persist a lineup as a draft (RLS: own team only; server-side cutoff applies). */
 export async function saveLineupDraft(client: SupabaseClient, lineup: Lineup): Promise<void> {
+  const { error } = await client.from('lineups').upsert(
+    {
+      tie_id: lineup.tieId,
+      team_id: lineup.teamId,
+      player_ids: lineup.playerIds,
+      status: 'draft',
+      submitted_at: null,
+      updated_at: new Date().toISOString()
+    },
+    { onConflict: 'tie_id,team_id' }
+  )
+  if (error) throw error
+}
+
+/**
+ * Submit a lineup: record status='submitted' + a timestamp. The caller must
+ * ensure the lineup is complete + valid (canSubmit); the server enforces the
+ * cutoff (refuses at/after — no reopen; admin edits via the admin policy).
+ */
+export async function submitLineup(client: SupabaseClient, lineup: Lineup): Promise<void> {
+  const now = new Date().toISOString()
+  const { error } = await client.from('lineups').upsert(
+    {
+      tie_id: lineup.tieId,
+      team_id: lineup.teamId,
+      player_ids: lineup.playerIds,
+      status: 'submitted',
+      submitted_at: now,
+      updated_at: now
+    },
+    { onConflict: 'tie_id,team_id' }
+  )
+  if (error) throw error
+}
+
+/** Recall a submitted lineup back to draft (only before the cutoff). */
+export async function recallLineup(client: SupabaseClient, lineup: Lineup): Promise<void> {
   const { error } = await client.from('lineups').upsert(
     {
       tie_id: lineup.tieId,

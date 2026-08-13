@@ -87,6 +87,39 @@ export function removePlayer(lineup: Lineup, rubberIndex: number, playerId: stri
  */
 export { resolveAsOf } from './validate'
 
+export interface CanSubmitArgs {
+  tieFormat: TieFormat
+  tie: Tie
+  roster: Player[]
+  asOf: string
+  lineup: Lineup
+  /** The team's other ties + their current lineups, for cross-slot clash checks. */
+  teamTies: Tie[]
+  teamLineups: Lineup[]
+}
+
+export type CanSubmitResult = { ok: true } | { ok: false; reasons: string[] }
+
+/**
+ * May this lineup be SUBMITTED? Requires a complete lineup with no violations
+ * (eligibility, pair-rule, usage, AND cross-slot double-booking). Returns the
+ * blocking reasons when not. Pure.
+ */
+export function canSubmit(args: CanSubmitArgs): CanSubmitResult {
+  const { tieFormat, tie, roster, asOf, lineup, teamTies, teamLineups } = args
+  if (!isLineupComplete(tieFormat, lineup)) {
+    return { ok: false, reasons: ['Lineup is not complete — every rubber must be filled.'] }
+  }
+  const within = validateLineup(tieFormat, tie, lineup, roster, { asOf })
+  const otherLineups = teamLineups.filter((l) => l.tieId !== tie.id)
+  const across = findDoubleBookings([tie, ...teamTies], [lineup, ...otherLineups])
+  const violations = [...within, ...across]
+  if (violations.length) {
+    return { ok: false, reasons: violations.map((v) => v.message) }
+  }
+  return { ok: true }
+}
+
 /** True when every rubber is filled to its expected size. */
 export function isLineupComplete(tieFormat: TieFormat, lineup: Lineup): boolean {
   if (lineup.playerIds.length !== tieFormat.rubbers.length) return false
