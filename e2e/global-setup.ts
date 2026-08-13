@@ -129,9 +129,21 @@ async function provisionManager(
   })
   if (!res.ok) {
     const body = await res.text()
-    // Idempotent: a re-run after a prior provision is fine (team already has a manager).
-    if (!/already|exists/i.test(body)) {
+    // The only legit idempotent outcome is 409 "team already has a manager"
+    // (a prior provision on a re-used local stack). Anything else is a real
+    // failure — do NOT swallow it (a broad regex masked createUser errors here).
+    if (res.status !== 409) {
       throw new Error(`provision ${email} failed (${res.status}): ${body}`)
     }
+  }
+  // Verify the manager can actually authenticate — surfaces createUser / link
+  // failures with a clear message instead of an opaque "stayed on /login" later.
+  const verify = await fetch(`${url}/auth/v1/token?grant_type=password`, {
+    method: 'POST',
+    headers: jsonHeaders(),
+    body: JSON.stringify({ email, password })
+  })
+  if (!verify.ok) {
+    throw new Error(`verify ${email} sign-in failed (${verify.status}): ${await verify.text()}`)
   }
 }
