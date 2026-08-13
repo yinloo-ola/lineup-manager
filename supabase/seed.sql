@@ -1,0 +1,3 @@
+-- Supabase local seed. Intentionally empty for the Ticket 1 scaffold —
+-- domain tables (teams, players, ties) arrive in Ticket 3.
+-- The E2E test administrator is created via the API in e2e/global-setup.ts.
