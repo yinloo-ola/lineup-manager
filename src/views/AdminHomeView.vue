@@ -44,6 +44,9 @@ async function signOut() {
             <v-btn variant="tonal" to="/format" prepend-icon="mdi-format-list-bulleted">
               Author Tie Format
             </v-btn>
+            <v-btn variant="tonal" to="/admin/lineups" prepend-icon="mdi-clipboard-list-outline">
+              All lineups
+            </v-btn>
           </v-card-actions>
         </v-card>
       </v-col>

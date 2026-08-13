@@ -1,5 +1,11 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { computeCutoff, isLocked } from '@/domain/cutoff'
+import {
+  buildAdminLineupRows,
+  type AdminLineupInput,
+  type AdminLineupRow,
+  type AdminTieInput
+} from '@/domain/adminView'
 import { emptyLineupFor } from '@/domain/lineupBuilder'
 import { loadTieFormat } from '@/services/tieFormatService'
 import type { Lineup, LineupStatus, Player, Tie, TieFormat } from '@/domain/types'
@@ -221,4 +227,74 @@ export async function saveLineupDraft(client: SupabaseClient, lineup: Lineup): P
  */
 export async function submitLineup(client: SupabaseClient, lineup: Lineup): Promise<void> {
   await upsertLineup(client, lineup, 'submitted', new Date().toISOString())
+}
+
+interface AdminLineupDbRow {
+  tie_id: string
+  team_id: string
+  status: string
+  updated_at: string
+  updated_by: string | null
+}
+interface AdminTieDbRow {
+  id: string
+  category_id: string
+  scheduled_start: string
+  team_a: string
+  team_b: string
+}
+
+/**
+ * Every team's lineups with team/opponent/category and the tie's cutoff/locked
+ * state — the administrator oversight view. Admin RLS sees all rows.
+ */
+export async function fetchAdminLineups(client: SupabaseClient): Promise<AdminLineupRow[]> {
+  const [lineupsRes, teamsRes, tiesRes, catsRes, formatsRes] = await Promise.all([
+    client.from('lineups').select('tie_id, team_id, status, updated_at, updated_by'),
+    client.from('teams').select('id, name'),
+    client.from('ties').select('id, category_id, scheduled_start, team_a, team_b'),
+    client.from('categories').select('id, name'),
+    client.from('tie_formats').select('category_id, lead_time_minutes')
+  ])
+  check(lineupsRes.error)
+  check(teamsRes.error)
+  check(tiesRes.error)
+  check(catsRes.error)
+  check(formatsRes.error)
+
+  const lineups: AdminLineupInput[] = (lineupsRes.data as AdminLineupDbRow[] | null ?? []).map(
+    (l) => ({
+      tieId: l.tie_id,
+      teamId: l.team_id,
+      status: STATUSES.includes(l.status as LineupStatus) ? (l.status as LineupStatus) : 'draft',
+      updatedAt: l.updated_at,
+      updatedBy: l.updated_by ?? null
+    })
+  )
+  const ties: AdminTieInput[] = (tiesRes.data as AdminTieDbRow[] | null ?? []).map((t) => ({
+    tieId: t.id,
+    categoryId: t.category_id,
+    scheduledStart: t.scheduled_start,
+    teamIds: [t.team_a, t.team_b]
+  }))
+  const teamNameById = new Map(
+    (teamsRes.data as { id: string; name: string }[] | null ?? []).map((t) => [t.id, t.name])
+  )
+  const categoryNameById = new Map(
+    (catsRes.data as { id: string; name: string }[] | null ?? []).map((c) => [c.id, c.name])
+  )
+  const leadTimeByCategory = new Map(
+    (formatsRes.data as { category_id: string; lead_time_minutes: number }[] | null ?? []).map(
+      (f) => [f.category_id, f.lead_time_minutes]
+    )
+  )
+
+  return buildAdminLineupRows({
+    lineups,
+    ties,
+    teamNameById,
+    categoryNameById,
+    leadTimeByCategory,
+    now: new Date().toISOString()
+  })
 }

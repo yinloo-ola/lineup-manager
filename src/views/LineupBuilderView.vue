@@ -32,6 +32,15 @@ const errorMessage = ref<string | null>(null)
 const busy = ref(false)
 
 const tieId = computed(() => String(route.params.tieId))
+// Managers edit their own team (auth.teamId); an administrator editing on behalf
+// of a team passes ?team=. RLS still gates what each role can actually read/write.
+const editingTeamId = computed(() => {
+  const q = route.query.team
+  return q ? String(q) : auth.teamId
+})
+// Admins may edit past the cutoff (the server-side policy allows them); managers
+// cannot. Controls are gated on `editable` rather than just `locked`.
+const editable = computed(() => !data.value?.locked || auth.isAdmin)
 
 function assigned(i: number): string[] {
   return working.value?.playerIds[i] ?? []
@@ -97,7 +106,7 @@ const submitCheck = computed<CanSubmitResult>(() => {
     teamLineups: d.teamLineups
   })
 })
-const submittable = computed(() => submitCheck.value.ok && !data.value?.locked)
+const submittable = computed(() => submitCheck.value.ok && editable.value)
 
 function rubberSummary(rubber: Rubber): string {
   const parts: string[] = [rubber.format === 'singles' ? 'Singles' : 'Doubles']
@@ -157,7 +166,7 @@ function onRemove(i: number, playerId: string): void {
 async function onSave(): Promise<void> {
   const d = data.value
   const w = working.value
-  if (!d || !w || d.locked) return
+  if (!d || !w || !editable.value) return
   busy.value = true
   feedback.value = null
   try {
@@ -174,7 +183,7 @@ async function onSave(): Promise<void> {
 async function onSubmit(): Promise<void> {
   const d = data.value
   const w = working.value
-  if (!d || !w || d.locked) return
+  if (!d || !w || !editable.value) return
   if (!submitCheck.value.ok) {
     feedback.value = { kind: 'error', text: submitCheck.value.reasons.join(' ') }
     return
@@ -195,7 +204,7 @@ async function onSubmit(): Promise<void> {
 async function onRecall(): Promise<void> {
   const d = data.value
   const w = working.value
-  if (!d || !w || d.locked) return
+  if (!d || !w || !editable.value) return
   busy.value = true
   feedback.value = null
   try {
@@ -215,12 +224,12 @@ function fmt(iso: string): string {
 
 async function load(): Promise<void> {
   errorMessage.value = null
-  if (!auth.teamId) {
+  if (!editingTeamId.value) {
     errorMessage.value = 'No team is assigned to this account.'
     return
   }
   try {
-    const d = await fetchLineupBuilderData(supabase, tieId.value, auth.teamId)
+    const d = await fetchLineupBuilderData(supabase, tieId.value, editingTeamId.value)
     data.value = d
     working.value = d.lineup
   } catch (e) {
@@ -239,7 +248,7 @@ onMounted(load)
         <template v-else>Lineup</template>
       </v-app-bar-title>
       <template #append>
-        <v-btn variant="text" prepend-icon="mdi-arrow-left" :to="{ name: 'manager' }">Back</v-btn>
+        <v-btn variant="text" prepend-icon="mdi-arrow-left" :to="auth.isAdmin ? '/admin/lineups' : { name: 'manager' }">Back</v-btn>
       </template>
     </v-app-bar>
 
@@ -248,8 +257,11 @@ onMounted(load)
     </v-alert>
 
     <template v-if="data && working">
-      <v-alert v-if="data.locked" type="warning" variant="tonal" class="mt-4">
+      <v-alert v-if="!editable" type="warning" variant="tonal" class="mt-4">
         Lineup is locked — the cutoff ({{ fmt(data.cutoff) }}) has passed. Drafts can no longer be saved.
+      </v-alert>
+      <v-alert v-else-if="data.locked" type="info" variant="tonal" class="mt-4">
+        Editing as administrator — the cutoff ({{ fmt(data.cutoff) }}) has passed, but admins may still edit.
       </v-alert>
 
       <v-row class="mt-2">
@@ -274,7 +286,7 @@ onMounted(load)
                     color="primary"
                     variant="tonal"
                     closable
-                    :disabled="data.locked"
+                    :disabled="!editable"
                     @click:close="onRemove(i, pid)"
                   >
                     {{ playerName(pid) }}
@@ -283,7 +295,7 @@ onMounted(load)
                 </div>
 
                 <v-select
-                  v-if="!rubberFull(i) && !data.locked"
+                  v-if="!rubberFull(i) && editable"
                   :model-value="selected[i] ?? null"
                   :items="availablePlayers(i)"
                   item-title="label"
@@ -356,7 +368,7 @@ onMounted(load)
                 size="large"
                 class="mt-4"
                 :loading="busy"
-                :disabled="data.locked"
+                :disabled="!editable"
                 @click="onSave"
               >
                 Save draft
@@ -381,7 +393,7 @@ onMounted(load)
                 variant="outlined"
                 class="mt-2"
                 :loading="busy"
-                :disabled="data.locked"
+                :disabled="!editable"
                 @click="onRecall"
               >
                 Recall to draft

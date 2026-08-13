@@ -14,15 +14,17 @@ export const useAuthStore = defineStore('auth', () => {
   const error = ref<string | null>(null)
   const mustChangePassword = ref(false)
   const teamId = ref<string | null>(null)
+  const isAdmin = ref(false)
 
   const isAuthenticated = computed(() => user.value !== null)
   const isManager = computed(() => teamId.value !== null)
 
-  /** Load the signed-in user's manager profile (if any). */
+  /** Load the signed-in user's manager profile (if any) + admin flag. */
   async function loadProfile(): Promise<void> {
     if (!user.value) {
       mustChangePassword.value = false
       teamId.value = null
+      isAdmin.value = false
       return
     }
     // Fetch first, then commit — never blank a known profile mid-fetch.
@@ -30,14 +32,18 @@ export const useAuthStore = defineStore('auth', () => {
     // we nulled teamId synchronously here, a concurrent navigation (right after
     // a password change) would read isManager as false and misroute a manager
     // to the admin home.
-    const { data } = await supabase
-      .from('team_managers')
-      .select('must_change_password, team_id')
-      .eq('user_id', user.value.id)
-      .maybeSingle()
-    if (data) {
-      mustChangePassword.value = !!data.must_change_password
-      teamId.value = data.team_id
+    const [tm, adminRes] = await Promise.all([
+      supabase
+        .from('team_managers')
+        .select('must_change_password, team_id')
+        .eq('user_id', user.value.id)
+        .maybeSingle(),
+      supabase.rpc('is_admin')
+    ])
+    isAdmin.value = !!adminRes.data
+    if (tm.data) {
+      mustChangePassword.value = !!tm.data.must_change_password
+      teamId.value = tm.data.team_id
     } else {
       mustChangePassword.value = false
       teamId.value = null
@@ -76,6 +82,7 @@ export const useAuthStore = defineStore('auth', () => {
     user.value = null
     mustChangePassword.value = false
     teamId.value = null
+    isAdmin.value = false
   }
 
   /** Set a new password and clear the must-change flag. */
@@ -93,6 +100,7 @@ export const useAuthStore = defineStore('auth', () => {
     error,
     mustChangePassword,
     teamId,
+    isAdmin,
     isAuthenticated,
     isManager,
     init,
