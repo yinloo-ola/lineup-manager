@@ -8,6 +8,7 @@ alter table lineups add column if not exists updated_by text;
 create or replace function public.set_lineup_audit()
 returns trigger
 language plpgsql
+set search_path = public
 as $$
 begin
   NEW.updated_by := coalesce(auth.jwt() ->> 'email', NEW.updated_by);

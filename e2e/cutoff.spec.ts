@@ -60,4 +60,12 @@ test('admin may still edit after the cutoff (no-reopen: admin-only)', async ({ r
     data: { tie_id: 'e2e-tie-past', team_id: 'e2e-b', player_ids: [['e2e-p3']], status: 'submitted' }
   })
   expect(res.ok()).toBeTruthy()
+
+  // Edits are attributed: the 0008 trigger stamps updated_by from the editor's JWT.
+  const got = await request.get(
+    `${url}/rest/v1/lineups?tie_id=eq.e2e-tie-past&team_id=eq.e2e-b&select=updated_by`,
+    { headers }
+  )
+  const rows = (await got.json()) as { updated_by: string | null }[]
+  expect(rows[0]?.updated_by).toBe(TEST_ADMIN_EMAIL)
 })

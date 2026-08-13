@@ -40,13 +40,18 @@ interface TeamRow {
 
 const STATUSES: LineupStatus[] = ['not-started', 'draft', 'submitted', 'invalidated']
 
+/** Coerce a stored status string into the domain union (unknown → draft). */
+function parseStatus(status: string): LineupStatus {
+  return STATUSES.includes(status as LineupStatus) ? (status as LineupStatus) : 'draft'
+}
+
 function toLineup(row: LineupRow): Lineup {
   const raw = Array.isArray(row.player_ids) ? (row.player_ids as (string[] | null)[]) : []
   return {
     tieId: row.tie_id,
     teamId: row.team_id,
     playerIds: raw,
-    status: STATUSES.includes(row.status as LineupStatus) ? (row.status as LineupStatus) : 'draft',
+    status: parseStatus(row.status),
     submittedAt: row.submitted_at ?? undefined,
     updatedAt: row.updated_at
   }
@@ -191,7 +196,8 @@ export async function fetchLineupBuilderData(
   }
 }
 
-/** Upsert a lineup row with a given status (RLS: own team; server-side cutoff). */
+/** Upsert a lineup row with a given status (RLS: own team; server-side cutoff).
+ *  updated_at/updated_by are stamped by the 0008 trigger (server-side). */
 async function upsertLineup(
   client: SupabaseClient,
   lineup: Lineup,
@@ -204,8 +210,7 @@ async function upsertLineup(
       team_id: lineup.teamId,
       player_ids: lineup.playerIds,
       status,
-      submitted_at: submittedAt,
-      updated_at: new Date().toISOString()
+      submitted_at: submittedAt
     },
     { onConflict: 'tie_id,team_id' }
   )
@@ -236,13 +241,6 @@ interface AdminLineupDbRow {
   updated_at: string
   updated_by: string | null
 }
-interface AdminTieDbRow {
-  id: string
-  category_id: string
-  scheduled_start: string
-  team_a: string
-  team_b: string
-}
 
 /**
  * Every team's lineups with team/opponent/category and the tie's cutoff/locked
@@ -266,19 +264,19 @@ export async function fetchAdminLineups(client: SupabaseClient): Promise<AdminLi
     (l) => ({
       tieId: l.tie_id,
       teamId: l.team_id,
-      status: STATUSES.includes(l.status as LineupStatus) ? (l.status as LineupStatus) : 'draft',
+      status: parseStatus(l.status),
       updatedAt: l.updated_at,
       updatedBy: l.updated_by ?? null
     })
   )
-  const ties: AdminTieInput[] = (tiesRes.data as AdminTieDbRow[] | null ?? []).map((t) => ({
+  const ties: AdminTieInput[] = (tiesRes.data as TieRow[] | null ?? []).map((t) => ({
     tieId: t.id,
     categoryId: t.category_id,
     scheduledStart: t.scheduled_start,
     teamIds: [t.team_a, t.team_b]
   }))
   const teamNameById = new Map(
-    (teamsRes.data as { id: string; name: string }[] | null ?? []).map((t) => [t.id, t.name])
+    (teamsRes.data as TeamRow[] | null ?? []).map((t) => [t.id, t.name])
   )
   const categoryNameById = new Map(
     (catsRes.data as { id: string; name: string }[] | null ?? []).map((c) => [c.id, c.name])
