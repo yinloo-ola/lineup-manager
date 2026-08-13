@@ -22,6 +22,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
   if (req.method !== "POST") return json({ error: "Method not allowed" }, 405);
 
+  try {
   // Service-role client (service_role is in env; bypasses RLS).
   const admin = createClient(
     Deno.env.get("SUPABASE_URL")!,
@@ -97,4 +98,20 @@ Deno.serve(async (req: Request): Promise<Response> => {
   }
 
   return json({ ok: true, userId: newUser.id }, 200);
+  } catch (e) {
+    // Temporary diagnostic: surface the actual throw + which env keys are present
+    // so the e2e failure can be pinpointed. (Values are NOT included — only presence.)
+    const msg = e instanceof Error ? e.message : String(e);
+    const stack = e instanceof Error ? e.stack : undefined;
+    return json({
+      error: "internal",
+      detail: msg,
+      stack,
+      env: {
+        SUPABASE_URL: !!Deno.env.get("SUPABASE_URL"),
+        SUPABASE_SERVICE_ROLE_KEY: !!Deno.env.get("SUPABASE_SERVICE_ROLE_KEY"),
+        SUPABASE_ANON_KEY: !!Deno.env.get("SUPABASE_ANON_KEY"),
+      },
+    }, 500);
+  }
 });
