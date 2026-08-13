@@ -34,6 +34,11 @@ async function signOut() {
             The scaffold is live. Roster views, Tie Format authoring, and lineup submission arrive in
             later tickets.
           </v-card-text>
+          <v-card-actions>
+            <v-btn variant="tonal" color="primary" to="/import" prepend-icon="mdi-database-import">
+              Import seed
+            </v-btn>
+          </v-card-actions>
         </v-card>
       </v-col>
     </v-row>
