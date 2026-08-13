@@ -116,12 +116,38 @@ export default async function globalSetup(): Promise<void> {
       team_b: 'e2e-c'
     }
   ])
+  // A second past-cutoff tie (Bravo vs Charlie), touched ONLY by the Ticket 8
+  // admin-overwrite spec, so its state stays deterministic (independent of the
+  // parallel cutoff.spec writes to e2e-tie-past).
+  await restUpsert(adminToken, 'ties', [
+    {
+      id: 'e2e-tie-past2',
+      category_id: 'e2e-cat',
+      scheduled_start: '2000-01-01T10:00:00+00:00',
+      table_label: '3',
+      team_a: 'e2e-b',
+      team_b: 'e2e-c'
+    }
+  ])
   await restUpsert(adminToken, 'tie_formats', [
     {
       category_id: 'e2e-cat',
       rubbers: [{ format: 'singles', constraint: { allowedGenders: ['M'] } }],
       usage_policy: null,
       lead_time_minutes: 30
+    }
+  ])
+
+  // A pre-existing submitted lineup (Alpha) so the admin dashboard reliably has
+  // a row to show regardless of parallel spec timing.
+  await restUpsert(adminToken, 'lineups', [
+    {
+      tie_id: 'e2e-tie',
+      team_id: 'e2e-a',
+      player_ids: [['e2e-p2']],
+      status: 'submitted',
+      submitted_at: '2026-01-01T00:00:00Z',
+      updated_at: '2026-01-01T00:00:00Z'
     }
   ])
 
