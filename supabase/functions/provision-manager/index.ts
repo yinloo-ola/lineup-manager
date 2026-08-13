@@ -59,14 +59,16 @@ Deno.serve(async (req: Request): Promise<Response> => {
     return json({ error: "email, password and teamId are required" }, 400);
   }
 
-  // Team must exist and not already have a manager (1:1).
-  const { data: team } = await admin
+  // Team must exist and not already have a manager (1:1). Read via the caller
+  // (admin) client — is_admin() RLS already authorises these reads, and this
+  // avoids relying on the service-role client for lookups.
+  const { data: team } = await caller
     .from("teams")
     .select("id")
     .eq("id", teamId)
     .maybeSingle();
   if (!team) return json({ error: "Team not found" }, 404);
-  const { data: existing } = await admin
+  const { data: existing } = await caller
     .from("team_managers")
     .select("user_id")
     .eq("team_id", teamId)
