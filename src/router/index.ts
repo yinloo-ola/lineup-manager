@@ -21,6 +21,12 @@ const router = createRouter({
       component: () => import('@/views/ManagerView.vue')
     },
     {
+      path: '/manager/tie/:tieId',
+      name: 'lineup-builder',
+      component: () => import('@/views/LineupBuilderView.vue'),
+      meta: { managerOnly: true }
+    },
+    {
       path: '/import',
       name: 'import',
       component: () => import('@/views/AdminImportView.vue'),
@@ -67,7 +73,9 @@ router.beforeEach(async (to) => {
 
   if (auth.isAuthenticated && !auth.mustChangePassword) {
     if (auth.isManager && (to.name === 'home' || to.meta.adminOnly)) return { name: 'manager' }
-    if (!auth.isManager && to.name === 'manager') return { name: 'home' }
+    if (!auth.isManager && (to.name === 'manager' || to.meta.managerOnly)) {
+      return { name: 'home' }
+    }
     if (to.name === 'change-password') return { name: auth.isManager ? 'manager' : 'home' }
   }
 

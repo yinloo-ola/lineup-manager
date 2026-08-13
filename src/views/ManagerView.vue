@@ -99,9 +99,17 @@ onMounted(load)
                   <v-chip :color="statusColor(t.status)" variant="tonal" class="mr-2" size="small">
                     {{ t.status }}
                   </v-chip>
-                  <v-chip :color="t.locked ? 'red' : 'green'" variant="tonal" size="small">
+                  <v-chip :color="t.locked ? 'red' : 'green'" variant="tonal" class="mr-2" size="small">
                     {{ t.locked ? 'locked' : 'open' }}
                   </v-chip>
+                  <v-btn
+                    size="small"
+                    variant="tonal"
+                    color="primary"
+                    :to="{ name: 'lineup-builder', params: { tieId: t.tieId } }"
+                  >
+                    Build lineup
+                  </v-btn>
                 </template>
               </v-list-item>
             </v-list>

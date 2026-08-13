@@ -19,6 +19,12 @@ export const TEST_MANAGER_EMAIL = 'manager@lineup.local'
 export const TEST_MANAGER_PASSWORD = 'manager-password-123'
 export const TEST_MANAGER_NEW_PASSWORD = 'manager-new-pw-123'
 
+// A second manager on team Bravo (e2e-b), independent of the first so the lineup
+// builder e2e is decoupled from manager.spec's destructive first-login password change.
+export const TEST_MANAGER2_EMAIL = 'manager2@lineup.local'
+export const TEST_MANAGER2_PASSWORD = 'manager2-password-123'
+export const TEST_MANAGER2_NEW_PASSWORD = 'manager2-new-pw-123'
+
 function jsonHeaders(token?: string): Record<string, string> {
   const h: Record<string, string> = {
     'Content-Type': 'application/json',
@@ -81,7 +87,9 @@ export default async function globalSetup(): Promise<void> {
   await restUpsert(adminToken, 'players', [
     { id: 'e2e-p1', team_id: 'e2e-a', name: 'Alice', gender: 'F', date_of_birth: '1990-01-01' },
     { id: 'e2e-p2', team_id: 'e2e-a', name: 'Alan', gender: 'M', date_of_birth: '1985-01-01' },
-    { id: 'e2e-p3', team_id: 'e2e-b', name: 'Bob', gender: 'M', date_of_birth: '1988-01-01' }
+    { id: 'e2e-p3', team_id: 'e2e-b', name: 'Bob', gender: 'M', date_of_birth: '1988-01-01' },
+    // A women's player on Bravo so the lineup builder e2e has an illegal (gender) pick to attempt.
+    { id: 'e2e-p4', team_id: 'e2e-b', name: 'Barbara', gender: 'F', date_of_birth: '1992-01-01' }
   ])
   // A tie in the far future so its cutoff is not yet reached.
   await restUpsert(adminToken, 'ties', [
@@ -103,20 +111,27 @@ export default async function globalSetup(): Promise<void> {
     }
   ])
 
-  // 3. Provision the manager via the real edge function.
-  const provRes = await fetch(`${url}/functions/v1/provision-manager`, {
+  // 3. Provision the managers via the real edge function (Alpha + Bravo).
+  await provisionManager(adminToken, TEST_MANAGER_EMAIL, TEST_MANAGER_PASSWORD, 'e2e-a')
+  await provisionManager(adminToken, TEST_MANAGER2_EMAIL, TEST_MANAGER2_PASSWORD, 'e2e-b')
+}
+
+async function provisionManager(
+  token: string,
+  email: string,
+  password: string,
+  teamId: string
+): Promise<void> {
+  const res = await fetch(`${url}/functions/v1/provision-manager`, {
     method: 'POST',
-    headers: jsonHeaders(adminToken),
-    body: JSON.stringify({
-      email: TEST_MANAGER_EMAIL,
-      password: TEST_MANAGER_PASSWORD,
-      teamId: 'e2e-a'
-    })
+    headers: jsonHeaders(token),
+    body: JSON.stringify({ email, password, teamId })
   })
-  if (!provRes.ok) {
-    const body = await provRes.text()
+  if (!res.ok) {
+    const body = await res.text()
+    // Idempotent: a re-run after a prior provision is fine (team already has a manager).
     if (!/already|exists/i.test(body)) {
-      throw new Error(`provision manager failed (${provRes.status}): ${body}`)
+      throw new Error(`provision ${email} failed (${res.status}): ${body}`)
     }
   }
 }
