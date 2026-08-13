@@ -15,7 +15,7 @@ test.describe('manager flow', () => {
 
     // The manager is forced to set their own password before anything else.
     await expect(page).toHaveURL(/\/change-password$/)
-    await page.getByRole('textbox', { name: 'New password' }).fill(TEST_MANAGER_NEW_PASSWORD)
+    await page.getByRole('textbox', { name: 'New password', exact: true }).fill(TEST_MANAGER_NEW_PASSWORD)
     await page
       .getByRole('textbox', { name: 'Confirm new password' })
       .fill(TEST_MANAGER_NEW_PASSWORD)
