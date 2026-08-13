@@ -50,5 +50,5 @@ test('admin tightens a constraint → submitted lineup invalidated → manager s
   await expect(page.getByText(/action needed/i)).toBeVisible()
   // The lineup data is retained (Bob is still assigned) but flagged ineligible by age.
   await expect(page.locator('.v-chip', { hasText: 'Bob (M)' })).toBeVisible()
-  await expect(page.getByText(/age/i)).toBeVisible()
+  await expect(page.getByText(/requires age min/i)).toBeVisible()
 })
