@@ -20,9 +20,16 @@ export const useAuthStore = defineStore('auth', () => {
 
   /** Load the signed-in user's manager profile (if any). */
   async function loadProfile(): Promise<void> {
-    mustChangePassword.value = false
-    teamId.value = null
-    if (!user.value) return
+    if (!user.value) {
+      mustChangePassword.value = false
+      teamId.value = null
+      return
+    }
+    // Fetch first, then commit — never blank a known profile mid-fetch.
+    // auth.updateUser() fires onAuthStateChange, which calls loadProfile(); if
+    // we nulled teamId synchronously here, a concurrent navigation (right after
+    // a password change) would read isManager as false and misroute a manager
+    // to the admin home.
     const { data } = await supabase
       .from('team_managers')
       .select('must_change_password, team_id')
@@ -31,6 +38,9 @@ export const useAuthStore = defineStore('auth', () => {
     if (data) {
       mustChangePassword.value = !!data.must_change_password
       teamId.value = data.team_id
+    } else {
+      mustChangePassword.value = false
+      teamId.value = null
     }
   }
 
