@@ -73,6 +73,9 @@ export function tryAssign(args: TryAssignArgs): TryAssignResult {
   const blocking = lineupViolations(candidate, { tieFormat, tie, roster, asOf, teamTies, teamLineups }).find((v) => {
     if (v.kind === 'incomplete-rubber') return false // partial drafts are allowed
     if (v.rubberIndex === rubberIndex) return true
+    // A cross-slot clash only blocks when THIS tie is implicated — a pre-existing
+    // clash between two OTHER ties (e.g. an admin error) must not strand the player.
+    if (v.kind === 'cross-slot-double-book') return !!v.tieIds?.includes(tie.id)
     return !!v.playerIds?.includes(playerId)
   })
 

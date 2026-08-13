@@ -215,6 +215,32 @@ describe('tryAssign — cross-slot double-booking', () => {
     )
     expect(r.ok).toBe(true)
   })
+
+  it('does not block a pick because of a pre-existing clash between OTHER ties', () => {
+    // p1 is double-booked across t2 + t3 (same slot), but the tie being edited
+    // (t1) is in a different slot — adding p1 here must still be allowed.
+    const slot = '2026-03-01T10:00'
+    const otherTies: Tie[] = [
+      { id: 't2', scheduledStart: slot, teamIds: ['A', 'C'] },
+      { id: 't3', scheduledStart: slot, teamIds: ['A', 'D'] }
+    ]
+    const otherLineups: Lineup[] = [
+      { tieId: 't2', teamId: 'A', playerIds: [['p1']], status: 'draft', updatedAt: '2026-01-01T00:00' },
+      { tieId: 't3', teamId: 'A', playerIds: [['p1']], status: 'draft', updatedAt: '2026-01-01T00:00' }
+    ]
+    const fmt: TieFormat = { rubbers: [{ format: 'singles', constraint: { allowedGenders: ['M'] } }] }
+    const r = tryAssign(
+      baseArgs({
+        tieFormat: fmt,
+        roster: [player('p1', 'M', '1990-01-01')],
+        lineup: emptyLineupFor(fmt, 't1', 'A'),
+        teamTies: otherTies,
+        teamLineups: otherLineups,
+        playerId: 'p1'
+      })
+    )
+    expect(r.ok).toBe(true)
+  })
 })
 
 describe('removePlayer', () => {
