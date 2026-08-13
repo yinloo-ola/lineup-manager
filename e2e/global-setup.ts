@@ -82,7 +82,9 @@ export default async function globalSetup(): Promise<void> {
   ])
   await restUpsert(adminToken, 'teams', [
     { id: 'e2e-a', name: 'Alpha' },
-    { id: 'e2e-b', name: 'Bravo' }
+    { id: 'e2e-b', name: 'Bravo' },
+    // Opponent for Bravo's past-cutoff tie (Ticket 7 server-side enforcement test).
+    { id: 'e2e-c', name: 'Charlie' }
   ])
   await restUpsert(adminToken, 'players', [
     { id: 'e2e-p1', team_id: 'e2e-a', name: 'Alice', gender: 'F', date_of_birth: '1990-01-01' },
@@ -100,6 +102,18 @@ export default async function globalSetup(): Promise<void> {
       table_label: '1',
       team_a: 'e2e-a',
       team_b: 'e2e-b'
+    }
+  ])
+  // A tie in the past so its cutoff has passed (Bravo vs Charlie). Used by the
+  // Ticket 7 server-side cutoff test: manager writes here must be refused.
+  await restUpsert(adminToken, 'ties', [
+    {
+      id: 'e2e-tie-past',
+      category_id: 'e2e-cat',
+      scheduled_start: '2000-01-01T10:00:00+00:00',
+      table_label: '2',
+      team_a: 'e2e-b',
+      team_b: 'e2e-c'
     }
   ])
   await restUpsert(adminToken, 'tie_formats', [
