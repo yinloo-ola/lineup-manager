@@ -1,23 +1,14 @@
 import { test, expect } from '@playwright/test'
-import { signInAndChangePassword } from './helpers'
-import {
-  TEST_MANAGER2_EMAIL,
-  TEST_MANAGER2_PASSWORD,
-  TEST_MANAGER2_NEW_PASSWORD
-} from './global-setup'
+import { signInManager } from './helpers'
+import { TEST_MANAGER2_EMAIL, TEST_MANAGER2_NEW_PASSWORD } from './global-setup'
 
 // Exercises the lineup builder end-to-end as the Bravo manager (own roster only,
-// via RLS). Uses a dedicated second manager so it is decoupled from manager.spec.
+// via RLS). Uses a dedicated second manager whose password is pre-set in
+// global-setup, so it is decoupled from manager.spec's forced-change flow.
 
 test.describe('lineup builder', () => {
   test('build a legal lineup; illegal pick refused; draft persists', async ({ page }) => {
-    await signInAndChangePassword(
-      page,
-      TEST_MANAGER2_EMAIL,
-      TEST_MANAGER2_PASSWORD,
-      TEST_MANAGER2_NEW_PASSWORD
-    )
-    await expect(page).toHaveURL(/\/manager$/)
+    await signInManager(page, TEST_MANAGER2_EMAIL, TEST_MANAGER2_NEW_PASSWORD)
 
     // Own roster visible; opponent's (Alpha) roster hidden by RLS.
     await expect(page.getByText('Bob').first()).toBeVisible()

@@ -41,6 +41,10 @@ async function signOut() {
   router.push({ name: 'login' })
 }
 
+function openBuilder(tieId: string): void {
+  router.push({ name: 'lineup-builder', params: { tieId } })
+}
+
 onMounted(load)
 </script>
 
@@ -106,7 +110,7 @@ onMounted(load)
                     size="small"
                     variant="tonal"
                     color="primary"
-                    :to="{ name: 'lineup-builder', params: { tieId: t.tieId } }"
+                    @click="openBuilder(t.tieId)"
                   >
                     Build lineup
                   </v-btn>

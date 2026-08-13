@@ -114,6 +114,35 @@ export default async function globalSetup(): Promise<void> {
   // 3. Provision the managers via the real edge function (Alpha + Bravo).
   await provisionManager(adminToken, TEST_MANAGER_EMAIL, TEST_MANAGER_PASSWORD, 'e2e-a')
   await provisionManager(adminToken, TEST_MANAGER2_EMAIL, TEST_MANAGER2_PASSWORD, 'e2e-b')
+
+  // 4. Complete manager2's first-login password change now, so the lineup builder
+  // e2e can sign straight in to /manager. This decouples it from manager.spec's
+  // destructive forced-change flow (and from retry-after-password-change).
+  await completeFirstLogin(TEST_MANAGER2_EMAIL, TEST_MANAGER2_PASSWORD, TEST_MANAGER2_NEW_PASSWORD)
+}
+
+/** Set a manager's own password and clear the must-change flag (mirrors the app flow). */
+async function completeFirstLogin(
+  email: string,
+  tempPassword: string,
+  newPassword: string
+): Promise<void> {
+  const token = await signIn(email, tempPassword)
+  const upd = await fetch(`${url}/auth/v1/user`, {
+    method: 'PUT',
+    headers: jsonHeaders(token),
+    body: JSON.stringify({ password: newPassword })
+  })
+  if (!upd.ok) {
+    throw new Error(`change ${email} password failed (${upd.status}): ${await upd.text()}`)
+  }
+  const clr = await fetch(`${url}/rest/v1/rpc/clear_must_change_password`, {
+    method: 'POST',
+    headers: jsonHeaders(token)
+  })
+  if (!clr.ok) {
+    throw new Error(`clear ${email} must-change failed (${clr.status}): ${await clr.text()}`)
+  }
 }
 
 async function provisionManager(
