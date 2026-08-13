@@ -1,11 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import {
-  tryAssign,
-  removePlayer,
-  resolveAsOf,
-  isLineupComplete,
-  emptyLineupFor
-} from '../lineupBuilder'
+import { tryAssign, removePlayer, isLineupComplete, emptyLineupFor } from '../lineupBuilder'
 import type { Lineup, Player, Tie, TieFormat } from '../types'
 
 const AS_OF = '2026-01-01'
@@ -233,18 +227,6 @@ describe('removePlayer', () => {
   it('removes one player from a doubles pair, leaving a partial', () => {
     const after = removePlayer(lineupOf(['p1', 'p2']), 0, 'p1')
     expect(after.playerIds[0]).toEqual(['p2'])
-  })
-})
-
-describe('resolveAsOf', () => {
-  it('uses a concrete constraint date', () => {
-    expect(resolveAsOf({ asOf: '2026-06-06' }, '2026-01-01')).toBe('2026-06-06')
-  })
-  it('falls back when asOf is the literal "tournament-start"', () => {
-    expect(resolveAsOf({ asOf: 'tournament-start' }, '2026-01-01')).toBe('2026-01-01')
-  })
-  it('falls back when asOf is omitted', () => {
-    expect(resolveAsOf({}, '2026-01-01')).toBe('2026-01-01')
   })
 })
 

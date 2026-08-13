@@ -5,7 +5,7 @@ import { useAuthStore } from '@/stores/auth'
 import { supabase } from '@/lib/supabase'
 import { fetchLineupBuilderData, saveLineupDraft, type LineupBuilderData } from '@/services/lineupService'
 import { isLineupComplete, removePlayer, tryAssign } from '@/domain/lineupBuilder'
-import { findDoubleBookings, validateLineup } from '@/domain/validate'
+import { expectedSlots, findDoubleBookings, validateLineup } from '@/domain/validate'
 import type { Lineup, Rubber, Violation } from '@/domain/types'
 
 const route = useRoute()
@@ -21,16 +21,13 @@ const busy = ref(false)
 
 const tieId = computed(() => String(route.params.tieId))
 
-function expectedFor(rubber: Rubber): number {
-  return rubber.format === 'singles' ? 1 : 2
-}
 function assigned(i: number): string[] {
   return working.value?.playerIds[i] ?? []
 }
 function rubberFull(i: number): boolean {
   const fmt = data.value?.tieFormat
   if (!fmt) return true
-  return assigned(i).length >= expectedFor(fmt.rubbers[i])
+  return assigned(i).length >= expectedSlots(fmt.rubbers[i])
 }
 function availablePlayers(i: number): { id: string; label: string }[] {
   const taken = new Set(assigned(i))
@@ -194,7 +191,7 @@ onMounted(load)
                 <v-card-title class="text-h6">
                   Rubber {{ i + 1 }} <span class="text-medium-emphasis text-body-2">· {{ rubberSummary(rubber) }}</span>
                 </v-card-title>
-                <v-card-subtitle>{{ expectedFor(rubber) }} player(s)</v-card-subtitle>
+                <v-card-subtitle>{{ expectedSlots(rubber) }} player(s)</v-card-subtitle>
               </v-card-item>
               <v-card-text>
                 <div class="d-flex flex-wrap align-center ga-2 mb-3">

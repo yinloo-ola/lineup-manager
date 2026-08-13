@@ -4,8 +4,8 @@
 // cross-slot clash) are refused with a clear reason, while partial lineups save
 // freely as drafts. Pure: no UI, no network.
 
-import { findDoubleBookings, validateLineup } from './validate'
-import type { Constraint, Lineup, Player, Tie, TieFormat } from './types'
+import { expectedSlots, findDoubleBookings, validateLineup } from './validate'
+import type { Lineup, Player, Tie, TieFormat } from './types'
 
 export interface TryAssignArgs {
   tieFormat: TieFormat
@@ -81,23 +81,18 @@ export function removePlayer(lineup: Lineup, rubberIndex: number, playerId: stri
 }
 
 /**
- * Resolve a rubber constraint's `asOf` to a concrete yyyy-mm-dd. The literal
- * `'tournament-start'` and an omitted value both fall back to `fallback`
- * (lineup-manager has no tournament-wide start, so the caller passes the tie's
- * scheduled date).
+ * Resolve a rubber constraint's `asOf` to a concrete yyyy-mm-dd. Re-exported
+ * from the validation engine (which honours it per-rubber) for callers that
+ * need the same resolution.
  */
-export function resolveAsOf(constraint: Constraint, fallback: string): string {
-  if (constraint.asOf && constraint.asOf !== 'tournament-start') return constraint.asOf
-  return fallback
-}
+export { resolveAsOf } from './validate'
 
 /** True when every rubber is filled to its expected size. */
 export function isLineupComplete(tieFormat: TieFormat, lineup: Lineup): boolean {
   if (lineup.playerIds.length !== tieFormat.rubbers.length) return false
   return tieFormat.rubbers.every((rubber, i) => {
     const slots = lineup.playerIds[i]
-    const expected = rubber.format === 'singles' ? 1 : 2
-    return !!slots && slots.length === expected
+    return !!slots && slots.length === expectedSlots(rubber)
   })
 }
 

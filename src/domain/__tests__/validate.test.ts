@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { validateLineup, findDoubleBookings } from '../validate'
+import { expectedSlots, findDoubleBookings, resolveAsOf, validateLineup } from '../validate'
 import type { Lineup, PairRule, Player, Rubber, Tie, TieFormat, ViolationKind } from '../types'
 
 const AS_OF = '2026-01-01'
@@ -312,5 +312,40 @@ describe('findDoubleBookings — cross-slot double-booking', () => {
     const v = findDoubleBookings(ties, lineups)
     expect(v).toHaveLength(1)
     expect([...(v[0].tieIds ?? [])].sort()).toEqual(['t1', 't2', 't3'])
+  })
+})
+
+describe('resolveAsOf', () => {
+  it('uses a concrete constraint date', () => {
+    expect(resolveAsOf({ asOf: '2026-06-06' }, '2026-01-01')).toBe('2026-06-06')
+  })
+  it('falls back when asOf is the literal "tournament-start"', () => {
+    expect(resolveAsOf({ asOf: 'tournament-start' }, '2026-01-01')).toBe('2026-01-01')
+  })
+  it('falls back when asOf is omitted', () => {
+    expect(resolveAsOf({}, '2026-01-01')).toBe('2026-01-01')
+  })
+})
+
+describe('expectedSlots', () => {
+  it('is 1 for singles and 2 for doubles', () => {
+    expect(expectedSlots({ format: 'singles', constraint: {} })).toBe(1)
+    expect(expectedSlots({ format: 'doubles', constraint: {}, pairRule: 'any' })).toBe(2)
+  })
+})
+
+describe('validateLineup — per-rubber asOf', () => {
+  it('honours a rubber constraint.asOf instead of the global opts.asOf', () => {
+    // Age min 18 evaluated as of 2020-01-01 (per-rubber), not the 2026 default.
+    const fmt: TieFormat = {
+      rubbers: [
+        { format: 'singles', constraint: { allowedGenders: ['M'], ageMin: 18, asOf: '2020-01-01' } }
+      ]
+    }
+    // Born 2005-01-01: age 15 on 2020-01-01 (too young) but 21 on 2026-01-01.
+    const roster = [player('p1', 'M', '2005-01-01')]
+    expect(kinds(validateLineup(fmt, tie, lineupOf(['p1']), roster, { asOf: AS_OF }))).toEqual([
+      'ineligible-age'
+    ])
   })
 })

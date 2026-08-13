@@ -1,4 +1,5 @@
 import type {
+  Constraint,
   Lineup,
   Player,
   Rubber,
@@ -10,8 +11,23 @@ import type {
 import { ageOn } from './age'
 
 export interface ValidateOptions {
-  /** Reference date (yyyy-mm-dd) at which ages are evaluated. */
+  /** Reference date (yyyy-mm-dd) at which ages are evaluated (tournament start). */
   asOf: string
+}
+
+/** Players a rubber fields: 1 for singles, 2 for doubles. */
+export function expectedSlots(rubber: Rubber): number {
+  return rubber.format === 'singles' ? 1 : 2
+}
+
+/**
+ * Resolve a rubber constraint's `asOf` to a concrete yyyy-mm-dd. The literal
+ * `'tournament-start'` and an omitted value both fall back to `fallback`
+ * (the tournament/tie date); a concrete date wins.
+ */
+export function resolveAsOf(constraint: Constraint, fallback: string): string {
+  if (constraint.asOf && constraint.asOf !== 'tournament-start') return constraint.asOf
+  return fallback
 }
 
 /**
@@ -41,7 +57,10 @@ export function validateLineup(
 
   tieFormat.rubbers.forEach((rubber, rubberIndex) => {
     const slots = lineup.playerIds[rubberIndex]
-    const expected = rubber.format === 'singles' ? 1 : 2
+    const expected = expectedSlots(rubber)
+    // Age is evaluated per-rubber: honour an explicit constraint.asOf, else the
+    // tournament/tie date passed as opts.asOf.
+    const asOf = resolveAsOf(rubber.constraint, opts.asOf)
 
     if (slots == null) {
       violations.push({
@@ -72,7 +91,7 @@ export function validateLineup(
         })
         continue
       }
-      checkEligibility(p, rubber, opts.asOf, rubberIndex, violations)
+      checkEligibility(p, rubber, asOf, rubberIndex, violations)
     }
 
     if (slots.length < expected) {

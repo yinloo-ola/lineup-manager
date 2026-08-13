@@ -1,6 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { computeCutoff, isLocked } from '@/domain/cutoff'
-import { emptyLineupFor, resolveAsOf } from '@/domain/lineupBuilder'
+import { emptyLineupFor } from '@/domain/lineupBuilder'
 import { loadTieFormat } from '@/services/tieFormatService'
 import type { Lineup, LineupStatus, Player, Tie, TieFormat } from '@/domain/types'
 
@@ -165,7 +165,8 @@ export async function fetchLineupBuilderData(
 
   const lead = tieFormat.leadTimeMinutes ?? 30
   const cutoff = computeCutoff(tie.scheduledStart, lead)
-  const asOf = resolveAsOf({ asOf: undefined }, tie.scheduledStart.slice(0, 10))
+  // Ages default to the tie date; a rubber may override via constraint.asOf.
+  const asOf = tie.scheduledStart.slice(0, 10)
 
   return {
     tie,
