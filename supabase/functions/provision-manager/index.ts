@@ -77,12 +77,16 @@ Deno.serve(async (req: Request): Promise<Response> => {
   if (existing) return json({ error: "That team already has a manager" }, 409);
 
   // Create the auth user (email confirmed so they can sign in immediately).
-  const { data: newUser, error: createErr } = await admin.auth.admin.createUser({
+  // createUser() returns { data: { user }, error } — read data.user, not data.
+  const { data: created, error: createErr } = await admin.auth.admin.createUser({
     email,
     password,
     email_confirm: true,
   });
-  if (createErr || !newUser) return json({ error: createErr?.message ?? "createUser failed" }, 400);
+  const newUser = created?.user ?? null;
+  if (createErr || !newUser) {
+    return json({ error: createErr?.message ?? "createUser failed" }, 400);
+  }
 
   // Link the user to the team with the must-change flag set.
   const { error: linkErr } = await admin.from("team_managers").insert({
@@ -93,25 +97,17 @@ Deno.serve(async (req: Request): Promise<Response> => {
   });
   if (linkErr) {
     // Best-effort rollback: drop the user we just created so re-tries are clean.
-    await admin.auth.admin.deleteUser(newUser.id);
+    // Wrapped so a rollback failure can never mask the original link error.
+    try {
+      await admin.auth.admin.deleteUser(newUser.id);
+    } catch {
+      /* best-effort; report the original link error below */
+    }
     return json({ error: linkErr.message }, 400);
   }
 
   return json({ ok: true, userId: newUser.id }, 200);
   } catch (e) {
-    // Temporary diagnostic: surface the actual throw + which env keys are present
-    // so the e2e failure can be pinpointed. (Values are NOT included — only presence.)
-    const msg = e instanceof Error ? e.message : String(e);
-    const stack = e instanceof Error ? e.stack : undefined;
-    return json({
-      error: "internal",
-      detail: msg,
-      stack,
-      env: {
-        SUPABASE_URL: !!Deno.env.get("SUPABASE_URL"),
-        SUPABASE_SERVICE_ROLE_KEY: !!Deno.env.get("SUPABASE_SERVICE_ROLE_KEY"),
-        SUPABASE_ANON_KEY: !!Deno.env.get("SUPABASE_ANON_KEY"),
-      },
-    }, 500);
+    return json({ error: "internal", detail: e instanceof Error ? e.message : String(e) }, 500);
   }
 });
