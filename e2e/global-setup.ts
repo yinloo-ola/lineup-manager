@@ -78,7 +78,10 @@ export default async function globalSetup(): Promise<void> {
 
   // 2. Fixture structure (admin can write via the is_admin() RLS policies).
   await restUpsert(adminToken, 'categories', [
-    { id: 'e2e-cat', name: "E2E Men's Team", short_name: 'EMT' }
+    { id: 'e2e-cat', name: "E2E Men's Team", short_name: 'EMT' },
+    // Isolated category for the Ticket 9 invalidation e2e (its own format/tie so
+    // tightening it cannot affect the other specs' lineups in e2e-cat).
+    { id: 'e2e-cat-inv', name: 'E2E Invalidation', short_name: 'EI' }
   ])
   await restUpsert(adminToken, 'teams', [
     { id: 'e2e-a', name: 'Alpha' },
@@ -129,9 +132,28 @@ export default async function globalSetup(): Promise<void> {
       team_b: 'e2e-c'
     }
   ])
+  // A future tie in the isolated invalidation category (Bravo vs Charlie). Bob
+  // (b. 1988) is 38 on 2026-12-01 — eligible for plain men's singles, but not
+  // once the admin tightens it to ageMin 40.
+  await restUpsert(adminToken, 'ties', [
+    {
+      id: 'e2e-tie-inv',
+      category_id: 'e2e-cat-inv',
+      scheduled_start: '2026-12-01T10:00:00+00:00',
+      table_label: '4',
+      team_a: 'e2e-b',
+      team_b: 'e2e-c'
+    }
+  ])
   await restUpsert(adminToken, 'tie_formats', [
     {
       category_id: 'e2e-cat',
+      rubbers: [{ format: 'singles', constraint: { allowedGenders: ['M'] } }],
+      usage_policy: null,
+      lead_time_minutes: 30
+    },
+    {
+      category_id: 'e2e-cat-inv',
       rubbers: [{ format: 'singles', constraint: { allowedGenders: ['M'] } }],
       usage_policy: null,
       lead_time_minutes: 30
@@ -145,6 +167,18 @@ export default async function globalSetup(): Promise<void> {
       tie_id: 'e2e-tie',
       team_id: 'e2e-a',
       player_ids: [['e2e-p2']],
+      status: 'submitted',
+      submitted_at: '2026-01-01T00:00:00Z',
+      updated_at: '2026-01-01T00:00:00Z'
+    }
+  ])
+  // A pre-existing SUBMITTED Bravo lineup on the isolated invalidation tie (Bob).
+  // The Ticket 9 e2e tightens the category's format and expects this to invalidate.
+  await restUpsert(adminToken, 'lineups', [
+    {
+      tie_id: 'e2e-tie-inv',
+      team_id: 'e2e-b',
+      player_ids: [['e2e-p3']],
       status: 'submitted',
       submitted_at: '2026-01-01T00:00:00Z',
       updated_at: '2026-01-01T00:00:00Z'
