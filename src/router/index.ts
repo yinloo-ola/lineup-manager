@@ -29,6 +29,11 @@ const router = createRouter({
       path: '/provision',
       name: 'provision',
       component: () => import('@/views/AdminProvisionView.vue')
+    },
+    {
+      path: '/format',
+      name: 'format',
+      component: () => import('@/views/AuthorTieFormatView.vue')
     }
   ]
 })

@@ -1,4 +1,8 @@
 import type { Gender } from './types'
+import { ParseError, array, object, string } from './parse-helpers'
+
+// Back-compat alias: existing callers/tests import SeedParseError.
+export { ParseError as SeedParseError } from './parse-helpers'
 
 /** A Team category present in the seed (the Tie Format is authored later, Ticket 4). */
 export interface SeedCategory {
@@ -45,16 +49,9 @@ export interface SeedFile {
   ties: SeedTie[]
 }
 
-export class SeedParseError extends Error {
-  constructor(message: string) {
-    super(message)
-    this.name = 'SeedParseError'
-  }
-}
-
 /**
  * Parse and validate an untrusted seed document into a {@link SeedFile}.
- * Throws {@link SeedParseError} on any structural or referential violation.
+ * Throws {@link ParseError} on any structural or referential violation.
  * Pure: no UI, no network.
  */
 export function parseSeed(input: unknown): SeedFile {
@@ -69,20 +66,20 @@ export function parseSeed(input: unknown): SeedFile {
   const teamIds = assertUnique(teams.map((t) => t.id), 'team')
   for (const p of players) {
     if (!teamIds.has(p.teamId)) {
-      throw new SeedParseError(`players: teamId "${p.teamId}" does not match any team.`)
+      throw new ParseError(`players: teamId "${p.teamId}" does not match any team.`)
     }
   }
   assertUnique(players.map((p) => p.id), 'player')
   const tieIds = new Set<string>()
   for (const t of ties) {
-    if (tieIds.has(t.id)) throw new SeedParseError(`Duplicate tie id "${t.id}".`)
+    if (tieIds.has(t.id)) throw new ParseError(`Duplicate tie id "${t.id}".`)
     tieIds.add(t.id)
     if (!categoryIds.has(t.categoryId)) {
-      throw new SeedParseError(`ties: categoryId "${t.categoryId}" does not match any category.`)
+      throw new ParseError(`ties: categoryId "${t.categoryId}" does not match any category.`)
     }
     for (const tid of t.teamIds) {
       if (!teamIds.has(tid)) {
-        throw new SeedParseError(`ties: teamId "${tid}" does not match any team.`)
+        throw new ParseError(`ties: teamId "${tid}" does not match any team.`)
       }
     }
   }
@@ -99,13 +96,11 @@ export function parseSeed(input: unknown): SeedFile {
 function assertUnique(ids: string[], what: string): Set<string> {
   const seen = new Set<string>()
   for (const id of ids) {
-    if (seen.has(id)) throw new SeedParseError(`Duplicate ${what} id "${id}".`)
+    if (seen.has(id)) throw new ParseError(`Duplicate ${what} id "${id}".`)
     seen.add(id)
   }
   return seen
 }
-
-// --- structural validators (referential integrity is added in a later cycle) ---
 
 function parseCategory(input: unknown, index: number): SeedCategory {
   const o = object(input, `categories[${index}]`)
@@ -141,31 +136,17 @@ function parseTie(input: unknown, index: number): SeedTie {
   const o = object(input, `ties[${index}]`)
   const teamIds = array(o.teamIds, `ties[${index}].teamIds`)
   if (teamIds.length !== 2) {
-    throw new SeedParseError(`ties[${index}].teamIds must contain exactly 2 team ids (got ${teamIds.length}).`)
+    throw new ParseError(`ties[${index}].teamIds must contain exactly 2 team ids (got ${teamIds.length}).`)
   }
   const tie: SeedTie = {
     id: string(o.id, `ties[${index}].id`),
     categoryId: string(o.categoryId, `ties[${index}].categoryId`),
     scheduledStart: string(o.scheduledStart, `ties[${index}].scheduledStart`),
-    teamIds: [string(teamIds[0], `ties[${index}].teamIds[0]`), string(teamIds[1], `ties[${index}].teamIds[1]`)]
+    teamIds: [
+      string(teamIds[0], `ties[${index}].teamIds[0]`),
+      string(teamIds[1], `ties[${index}].teamIds[1]`)
+    ]
   }
   if (o.table !== undefined) tie.table = string(o.table, `ties[${index}].table`)
   return tie
-}
-
-function object(v: unknown, ctx: string): Record<string, unknown> {
-  if (typeof v !== 'object' || v === null || Array.isArray(v)) {
-    throw new SeedParseError(`${ctx} must be an object.`)
-  }
-  return v as Record<string, unknown>
-}
-
-function array(v: unknown, ctx: string): unknown[] {
-  if (!Array.isArray(v)) throw new SeedParseError(`${ctx} must be an array.`)
-  return v
-}
-
-function string(v: unknown, ctx: string): string {
-  if (typeof v !== 'string') throw new SeedParseError(`${ctx} must be a string.`)
-  return v
 }

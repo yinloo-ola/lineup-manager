@@ -49,6 +49,8 @@ export interface TieFormat {
   rubbers: Rubber[]
   /** Within-Tie player usage. Defaults to at-most-once when omitted. */
   usagePolicy?: UsagePolicy
+  /** Cutoff lead time in minutes: cutoff = tie scheduled start - lead. Default 30. */
+  leadTimeMinutes?: number
 }
 
 /** A player on a team roster. */

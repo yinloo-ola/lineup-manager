@@ -41,6 +41,9 @@ async function signOut() {
             <v-btn variant="tonal" to="/provision" prepend-icon="mdi-account-plus">
               Provision manager
             </v-btn>
+            <v-btn variant="tonal" to="/format" prepend-icon="mdi-format-list-bulleted">
+              Author Tie Format
+            </v-btn>
           </v-card-actions>
         </v-card>
       </v-col>
