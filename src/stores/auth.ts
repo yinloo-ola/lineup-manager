@@ -5,23 +5,45 @@ import { supabase } from '@/lib/supabase'
 
 // Authentication store (Pinia, setup style). Backed by Supabase Auth.
 //
-// Role distinction (Administrator vs Team Manager) arrives in later tickets;
-// for this scaffold, any authenticated user reaches the admin home page.
+// Managers are bound 1:1 to a team via the team_managers table; on login we load
+// that profile to drive the forced first-login password change. Administrators
+// have no team_managers row, so mustChangePassword stays false for them.
 export const useAuthStore = defineStore('auth', () => {
   const user = ref<User | null>(null)
   const loading = ref(true)
   const error = ref<string | null>(null)
+  const mustChangePassword = ref(false)
+  const teamId = ref<string | null>(null)
 
   const isAuthenticated = computed(() => user.value !== null)
+  const isManager = computed(() => teamId.value !== null)
+
+  /** Load the signed-in user's manager profile (if any). */
+  async function loadProfile(): Promise<void> {
+    mustChangePassword.value = false
+    teamId.value = null
+    if (!user.value) return
+    const { data } = await supabase
+      .from('team_managers')
+      .select('must_change_password, team_id')
+      .eq('user_id', user.value.id)
+      .maybeSingle()
+    if (data) {
+      mustChangePassword.value = !!data.must_change_password
+      teamId.value = data.team_id
+    }
+  }
 
   /** Load the existing session and subscribe to auth changes. Idempotent. */
   async function init() {
     if (!loading.value) return
     const { data } = await supabase.auth.getSession()
     user.value = data.session?.user ?? null
+    await loadProfile()
     loading.value = false
-    supabase.auth.onAuthStateChange((_event, session) => {
+    supabase.auth.onAuthStateChange(async (_event, session) => {
       user.value = session?.user ?? null
+      await loadProfile()
     })
   }
 
@@ -36,12 +58,36 @@ export const useAuthStore = defineStore('auth', () => {
       throw signInError
     }
     user.value = data.user
+    await loadProfile()
   }
 
   async function signOut() {
     await supabase.auth.signOut()
     user.value = null
+    mustChangePassword.value = false
+    teamId.value = null
   }
 
-  return { user, loading, error, isAuthenticated, init, signIn, signOut }
+  /** Set a new password and clear the must-change flag. */
+  async function changePassword(newPassword: string) {
+    const { error: updateError } = await supabase.auth.updateUser({ password: newPassword })
+    if (updateError) throw updateError
+    const { error: rpcError } = await supabase.rpc('clear_must_change_password')
+    if (rpcError) throw rpcError
+    mustChangePassword.value = false
+  }
+
+  return {
+    user,
+    loading,
+    error,
+    mustChangePassword,
+    teamId,
+    isAuthenticated,
+    isManager,
+    init,
+    signIn,
+    signOut,
+    changePassword
+  }
 })

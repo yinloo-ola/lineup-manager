@@ -38,6 +38,9 @@ async function signOut() {
             <v-btn variant="tonal" color="primary" to="/import" prepend-icon="mdi-database-import">
               Import seed
             </v-btn>
+            <v-btn variant="tonal" to="/provision" prepend-icon="mdi-account-plus">
+              Provision manager
+            </v-btn>
           </v-card-actions>
         </v-card>
       </v-col>
