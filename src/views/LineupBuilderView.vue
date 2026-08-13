@@ -11,6 +11,7 @@ import {
 } from '@/services/lineupService'
 import {
   canSubmit,
+  effectiveStatus,
   isLineupComplete,
   lineupViolations,
   removePlayer,
@@ -61,9 +62,9 @@ function playerName(id: string): string {
   return p ? `${p.name} (${p.gender})` : id
 }
 
-// Current standing issues in the working lineup (excluding "incomplete rubber",
-// which is expected while drafting). Drives the per-rubber + global alerts.
-const issues = computed<Violation[]>(() => {
+// All current violations of the working lineup (re-validated against the live
+// structure). Drives the effective status; `issues` (below) drives the alerts.
+const violations = computed<Violation[]>(() => {
   const d = data.value
   const w = working.value
   if (!d || !w) return []
@@ -74,8 +75,17 @@ const issues = computed<Violation[]>(() => {
     asOf: d.asOf,
     teamTies: d.teamTies,
     teamLineups: d.teamLineups
-  }).filter((v) => v.kind !== 'incomplete-rubber')
+  })
 })
+// Issues shown as alerts, excluding "incomplete rubber" (expected while drafting).
+const issues = computed<Violation[]>(() =>
+  violations.value.filter((v) => v.kind !== 'incomplete-rubber')
+)
+// Effective status re-validates a submitted lineup: if the structure changed and
+// it is now illegal, it reads as `invalidated` (data retained; resubmit to clear).
+const effective = computed(
+  () => effectiveStatus(working.value?.status ?? 'not-started', violations.value)
+)
 const rubberIssues = computed<Violation[][]>(() => {
   const byRubber: Violation[][] = []
   for (const v of issues.value) {
@@ -330,15 +340,30 @@ onMounted(load)
               </v-card-subtitle>
             </v-card-item>
             <v-card-text>
-              <v-chip :color="working.status === 'submitted' ? 'green' : complete ? 'green' : 'amber'" variant="tonal" class="mr-2">
-                {{ working.status }}
+              <v-chip
+                :color="effective === 'invalidated' ? 'red' : effective === 'submitted' ? 'green' : complete ? 'green' : 'amber'"
+                variant="tonal"
+                class="mr-2"
+              >
+                {{ effective }}
               </v-chip>
-              <v-chip v-if="working.status !== 'submitted'" :color="complete ? 'green' : 'amber'" variant="tonal">
+              <v-chip v-if="effective !== 'submitted'" :color="complete ? 'green' : 'amber'" variant="tonal">
                 {{ complete ? 'complete' : 'incomplete' }}
               </v-chip>
               <p v-if="working.submittedAt" class="text-body-2 text-medium-emphasis mt-2">
                 Submitted {{ fmt(working.submittedAt) }}
               </p>
+
+              <v-alert
+                v-if="effective === 'invalidated'"
+                type="error"
+                variant="tonal"
+                density="comfortable"
+                class="mt-3"
+              >
+                Invalidated — action needed. The Tie Format changed and this submitted lineup no
+                longer satisfies the rules. Recall it to draft, fix the issues below, and re-submit.
+              </v-alert>
 
               <v-alert
                 v-for="(v, vi) in globalIssues"

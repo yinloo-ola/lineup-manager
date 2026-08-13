@@ -74,8 +74,9 @@ onMounted(load)
               <td>{{ r.opponentName }}</td>
               <td>{{ r.categoryName }}</td>
               <td>
-                <v-chip :color="statusColor(r.status)" variant="tonal" size="small">{{ r.status }}</v-chip>
-                <v-chip v-if="r.locked" color="red" variant="tonal" size="small" class="ml-1">locked</v-chip>
+                <v-chip :color="statusColor(r.effectiveStatus)" variant="tonal" size="small">{{ r.effectiveStatus }}</v-chip>
+                <v-chip v-if="r.effectiveStatus === 'invalidated'" color="red" variant="tonal" size="small" class="ml-1">action needed</v-chip>
+                <v-chip v-else-if="r.locked" color="red" variant="tonal" size="small" class="ml-1">locked</v-chip>
               </td>
               <td>{{ fmt(r.scheduledStart) }}</td>
               <td>{{ fmt(r.cutoff) }}</td>

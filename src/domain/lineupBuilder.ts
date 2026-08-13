@@ -5,7 +5,7 @@
 // freely as drafts. Pure: no UI, no network.
 
 import { expectedSlots, findDoubleBookings, validateLineup } from './validate'
-import type { Lineup, Player, Tie, TieFormat, Violation } from './types'
+import type { Lineup, LineupStatus, Player, Tie, TieFormat, Violation } from './types'
 
 /** Shared context for validating a lineup against its tie + team fixtures. */
 export interface LineupViolationsContext {
@@ -17,6 +17,17 @@ export interface LineupViolationsContext {
    *  Should NOT include the tie being validated (it is represented by `lineup`). */
   teamTies: Tie[]
   teamLineups: Lineup[]
+}
+
+/**
+ * The status a lineup effectively has once re-validated against the current
+ * structure. A SUBMITTED lineup that is now invalid (the Tie Format / Constraint
+ * / Rubber changed, or a tie was rescheduled into a clash) is shown as
+ * `invalidated` — its data is retained, but it loses `submitted` until corrected
+ * and re-submitted. Drafts / not-started lineups are never auto-invalidated.
+ */
+export function effectiveStatus(status: LineupStatus, violations: Violation[]): LineupStatus {
+  return status === 'submitted' && violations.length > 0 ? 'invalidated' : status
 }
 
 /**

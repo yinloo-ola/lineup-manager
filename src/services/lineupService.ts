@@ -7,6 +7,7 @@ import {
   type AdminTieInput
 } from '@/domain/adminView'
 import { emptyLineupFor } from '@/domain/lineupBuilder'
+import { parseTieFormat } from '@/domain/tieFormat'
 import { loadTieFormat } from '@/services/tieFormatService'
 import type { Lineup, LineupStatus, Player, Tie, TieFormat } from '@/domain/types'
 
@@ -29,6 +30,7 @@ interface TieRow {
 }
 interface PlayerRow {
   id: string
+  team_id: string
   name: string
   gender: string
   date_of_birth: string
@@ -238,33 +240,44 @@ interface AdminLineupDbRow {
   tie_id: string
   team_id: string
   status: string
+  player_ids: unknown
   updated_at: string
   updated_by: string | null
 }
+interface AdminFormatDbRow {
+  category_id: string
+  rubbers: unknown
+  usage_policy: unknown
+  lead_time_minutes: number
+}
 
 /**
- * Every team's lineups with team/opponent/category and the tie's cutoff/locked
- * state — the administrator oversight view. Admin RLS sees all rows.
+ * Every team's lineups with team/opponent/category, the tie's cutoff/locked
+ * state, and a re-validated effective status — the administrator oversight view.
+ * Admin RLS sees all rows.
  */
 export async function fetchAdminLineups(client: SupabaseClient): Promise<AdminLineupRow[]> {
-  const [lineupsRes, teamsRes, tiesRes, catsRes, formatsRes] = await Promise.all([
-    client.from('lineups').select('tie_id, team_id, status, updated_at, updated_by'),
+  const [lineupsRes, teamsRes, tiesRes, catsRes, formatsRes, playersRes] = await Promise.all([
+    client.from('lineups').select('tie_id, team_id, status, player_ids, updated_at, updated_by'),
     client.from('teams').select('id, name'),
     client.from('ties').select('id, category_id, scheduled_start, team_a, team_b'),
     client.from('categories').select('id, name'),
-    client.from('tie_formats').select('category_id, lead_time_minutes')
+    client.from('tie_formats').select('category_id, rubbers, usage_policy, lead_time_minutes'),
+    client.from('players').select('id, team_id, name, gender, date_of_birth')
   ])
   check(lineupsRes.error)
   check(teamsRes.error)
   check(tiesRes.error)
   check(catsRes.error)
   check(formatsRes.error)
+  check(playersRes.error)
 
   const lineups: AdminLineupInput[] = (lineupsRes.data as AdminLineupDbRow[] | null ?? []).map(
     (l) => ({
       tieId: l.tie_id,
       teamId: l.team_id,
       status: parseStatus(l.status),
+      playerIds: Array.isArray(l.player_ids) ? (l.player_ids as (string[] | null)[]) : [],
       updatedAt: l.updated_at,
       updatedBy: l.updated_by ?? null
     })
@@ -281,11 +294,24 @@ export async function fetchAdminLineups(client: SupabaseClient): Promise<AdminLi
   const categoryNameById = new Map(
     (catsRes.data as { id: string; name: string }[] | null ?? []).map((c) => [c.id, c.name])
   )
-  const leadTimeByCategory = new Map(
-    (formatsRes.data as { category_id: string; lead_time_minutes: number }[] | null ?? []).map(
-      (f) => [f.category_id, f.lead_time_minutes]
-    )
+  const formats = formatsRes.data as AdminFormatDbRow[] | null ?? []
+  const leadTimeByCategory = new Map(formats.map((f) => [f.category_id, f.lead_time_minutes]))
+  const formatByCategory = new Map(
+    formats.map((f) => [
+      f.category_id,
+      parseTieFormat({
+        rubbers: f.rubbers,
+        usagePolicy: f.usage_policy ?? undefined,
+        leadTimeMinutes: f.lead_time_minutes
+      })
+    ])
   )
+  const rosterByTeam = new Map<string, Player[]>()
+  for (const p of (playersRes.data as PlayerRow[] | null ?? [])) {
+    const arr = rosterByTeam.get(p.team_id) ?? []
+    arr.push({ id: p.id, name: p.name, gender: p.gender, dateOfBirth: p.date_of_birth })
+    rosterByTeam.set(p.team_id, arr)
+  }
 
   return buildAdminLineupRows({
     lineups,
@@ -293,6 +319,8 @@ export async function fetchAdminLineups(client: SupabaseClient): Promise<AdminLi
     teamNameById,
     categoryNameById,
     leadTimeByCategory,
+    rosterByTeam,
+    formatByCategory,
     now: new Date().toISOString()
   })
 }

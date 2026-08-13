@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { canSubmit, tryAssign, removePlayer, isLineupComplete, emptyLineupFor } from '../lineupBuilder'
+import { canSubmit, effectiveStatus, tryAssign, removePlayer, isLineupComplete, emptyLineupFor } from '../lineupBuilder'
 import type { Lineup, Player, Tie, TieFormat } from '../types'
 
 const AS_OF = '2026-01-01'
@@ -253,6 +253,23 @@ describe('removePlayer', () => {
   it('removes one player from a doubles pair, leaving a partial', () => {
     const after = removePlayer(lineupOf(['p1', 'p2']), 0, 'p1')
     expect(after.playerIds[0]).toEqual(['p2'])
+  })
+})
+
+describe('effectiveStatus', () => {
+  const v = (message: string) => ({ kind: 'ineligible-age' as const, message })
+
+  it('keeps a submitted lineup submitted when there are no violations', () => {
+    expect(effectiveStatus('submitted', [])).toBe('submitted')
+  })
+  it('invalidates a submitted lineup that now has violations', () => {
+    expect(effectiveStatus('submitted', [v('too old')])).toBe('invalidated')
+  })
+  it('does not invalidate drafts (the manager is still editing)', () => {
+    expect(effectiveStatus('draft', [v('too old')])).toBe('draft')
+  })
+  it('leaves not-started lineups as not-started', () => {
+    expect(effectiveStatus('not-started', [v('x')])).toBe('not-started')
   })
 })
 
