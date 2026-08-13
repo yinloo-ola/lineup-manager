@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test'
-import { signInManager } from './helpers'
+import { apiToken, authHeaders, signInManager, supabaseUrl } from './helpers'
 import {
   TEST_ADMIN_EMAIL,
   TEST_ADMIN_PASSWORD,
@@ -11,30 +11,15 @@ import {
 // the lineup is re-validated and shown as `invalidated` (data retained). Uses an
 // isolated category (e2e-cat-inv) so tightening it cannot affect other specs.
 
-const url = process.env.VITE_SUPABASE_URL ?? 'http://127.0.0.1:54321'
-const anonKey =
-  process.env.VITE_SUPABASE_ANON_KEY ??
-  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6ImFub24iLCJleHAiOjE5ODM4MTI5OTZ9.CRXP1A7WlE3zzhIv_pE2z_aF1kEzvH7vVfW5Xa3hEFc'
-
 test('admin tightens a constraint → submitted lineup invalidated → manager sees it', async ({
   page,
   request
 }) => {
   // 1. Admin tightens e2e-cat-inv: add ageMin 40. Bob (b. 1988 → 38 on 2026-12-01)
   //    is now too young, so Bravo's submitted lineup becomes invalid.
-  const signIn = await request.post(`${url}/auth/v1/token?grant_type=password`, {
-    headers: { apikey: anonKey, 'Content-Type': 'application/json' },
-    data: { email: TEST_ADMIN_EMAIL, password: TEST_ADMIN_PASSWORD }
-  })
-  expect(signIn.ok()).toBeTruthy()
-  const { access_token } = (await signIn.json()) as { access_token: string }
-  const tighten = await request.post(`${url}/rest/v1/tie_formats`, {
-    headers: {
-      apikey: anonKey,
-      Authorization: `Bearer ${access_token}`,
-      'Content-Type': 'application/json',
-      Prefer: 'resolution=merge-duplicates,return=minimal'
-    },
+  const token = await apiToken(request, TEST_ADMIN_EMAIL, TEST_ADMIN_PASSWORD)
+  const tighten = await request.post(`${supabaseUrl}/rest/v1/tie_formats`, {
+    headers: { ...authHeaders(token), Prefer: 'resolution=merge-duplicates,return=minimal' },
     data: {
       category_id: 'e2e-cat-inv',
       rubbers: [{ format: 'singles', constraint: { allowedGenders: ['M'], ageMin: 40 } }],

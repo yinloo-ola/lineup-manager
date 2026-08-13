@@ -10,13 +10,11 @@ import {
   type LineupBuilderData
 } from '@/services/lineupService'
 import {
-  canSubmit,
   effectiveStatus,
   isLineupComplete,
   lineupViolations,
   removePlayer,
-  tryAssign,
-  type CanSubmitResult
+  tryAssign
 } from '@/domain/lineupBuilder'
 import { expectedSlots } from '@/domain/validate'
 import type { Lineup, Rubber, Violation } from '@/domain/types'
@@ -100,23 +98,10 @@ const complete = computed(() => {
   const w = working.value
   return !!(d && w && isLineupComplete(d.tieFormat, w))
 })
-// Submit requires a complete + valid lineup (canSubmit). Re-evaluated as the
-// working lineup changes; the server re-checks the cutoff on write.
-const submitCheck = computed<CanSubmitResult>(() => {
-  const d = data.value
-  const w = working.value
-  if (!d || !w) return { ok: false, reasons: ['No lineup loaded.'] }
-  return canSubmit({
-    tieFormat: d.tieFormat,
-    tie: d.tie,
-    roster: d.roster,
-    asOf: d.asOf,
-    lineup: w,
-    teamTies: d.teamTies,
-    teamLineups: d.teamLineups
-  })
-})
-const submittable = computed(() => submitCheck.value.ok && editable.value)
+// Submit needs a complete lineup with no standing issues (reuses the already-
+// computed `violations`/`complete` — no second validation pass). The server
+// re-checks the cutoff on write.
+const submittable = computed(() => complete.value && issues.value.length === 0 && editable.value)
 
 function rubberSummary(rubber: Rubber): string {
   const parts: string[] = [rubber.format === 'singles' ? 'Singles' : 'Doubles']
@@ -193,11 +178,7 @@ async function onSave(): Promise<void> {
 async function onSubmit(): Promise<void> {
   const d = data.value
   const w = working.value
-  if (!d || !w || !editable.value) return
-  if (!submitCheck.value.ok) {
-    feedback.value = { kind: 'error', text: submitCheck.value.reasons.join(' ') }
-    return
-  }
+  if (!d || !w || !submittable.value) return
   busy.value = true
   feedback.value = null
   try {

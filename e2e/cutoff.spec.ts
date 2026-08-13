@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test'
+import { apiToken, authHeaders, supabaseUrl } from './helpers'
 import {
   TEST_ADMIN_EMAIL,
   TEST_ADMIN_PASSWORD,
@@ -11,30 +12,13 @@ import {
 // the cutoff. Uses the Bravo manager's REST token (no browser) against the past
 // tie (e2e-tie-past), whose cutoff has long passed.
 
-const url = process.env.VITE_SUPABASE_URL ?? 'http://127.0.0.1:54321'
-const anonKey =
-  process.env.VITE_SUPABASE_ANON_KEY ??
-  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6ImFub24iLCJleHAiOjE5ODM4MTI5OTZ9.CRXP1A7WlE3zzhIv_pE2z_aF1kEzvH7vVfW5Xa3hEFc'
-
 test('server refuses manager lineup writes at/after the cutoff', async ({ request }) => {
-  // Sign in as the Bravo manager.
-  const signIn = await request.post(`${url}/auth/v1/token?grant_type=password`, {
-    headers: { apikey: anonKey, 'Content-Type': 'application/json' },
-    data: { email: TEST_MANAGER2_EMAIL, password: TEST_MANAGER2_NEW_PASSWORD }
-  })
-  expect(signIn.ok()).toBeTruthy()
-  const { access_token } = (await signIn.json()) as { access_token: string }
-  const headers = {
-    apikey: anonKey,
-    Authorization: `Bearer ${access_token}`,
-    'Content-Type': 'application/json',
-    Prefer: 'return=minimal'
-  }
+  const token = await apiToken(request, TEST_MANAGER2_EMAIL, TEST_MANAGER2_NEW_PASSWORD)
 
   // Write to the past tie (cutoff passed): the RLS WITH CHECK (not tie_locked)
   // must refuse this on the server, regardless of any client clock.
-  const res = await request.post(`${url}/rest/v1/lineups`, {
-    headers,
+  const res = await request.post(`${supabaseUrl}/rest/v1/lineups`, {
+    headers: authHeaders(token),
     data: { tie_id: 'e2e-tie-past', team_id: 'e2e-b', player_ids: [['e2e-p3']], status: 'draft' }
   })
   expect(res.ok()).toBeFalsy()
@@ -42,29 +26,18 @@ test('server refuses manager lineup writes at/after the cutoff', async ({ reques
 
 test('admin may still edit after the cutoff (no-reopen: admin-only)', async ({ request }) => {
   // The other half of no-reopen: managers are blocked, but admins keep access.
-  const signIn = await request.post(`${url}/auth/v1/token?grant_type=password`, {
-    headers: { apikey: anonKey, 'Content-Type': 'application/json' },
-    data: { email: TEST_ADMIN_EMAIL, password: TEST_ADMIN_PASSWORD }
-  })
-  expect(signIn.ok()).toBeTruthy()
-  const { access_token } = (await signIn.json()) as { access_token: string }
-  const headers = {
-    apikey: anonKey,
-    Authorization: `Bearer ${access_token}`,
-    'Content-Type': 'application/json',
-    Prefer: 'return=minimal'
-  }
+  const token = await apiToken(request, TEST_ADMIN_EMAIL, TEST_ADMIN_PASSWORD)
 
-  const res = await request.post(`${url}/rest/v1/lineups`, {
-    headers,
+  const res = await request.post(`${supabaseUrl}/rest/v1/lineups`, {
+    headers: authHeaders(token),
     data: { tie_id: 'e2e-tie-past', team_id: 'e2e-b', player_ids: [['e2e-p3']], status: 'submitted' }
   })
   expect(res.ok()).toBeTruthy()
 
   // Edits are attributed: the 0008 trigger stamps updated_by from the editor's JWT.
   const got = await request.get(
-    `${url}/rest/v1/lineups?tie_id=eq.e2e-tie-past&team_id=eq.e2e-b&select=updated_by`,
-    { headers }
+    `${supabaseUrl}/rest/v1/lineups?tie_id=eq.e2e-tie-past&team_id=eq.e2e-b&select=updated_by`,
+    { headers: authHeaders(token) }
   )
   const rows = (await got.json()) as { updated_by: string | null }[]
   expect(rows[0]?.updated_by).toBe(TEST_ADMIN_EMAIL)

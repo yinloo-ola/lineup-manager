@@ -96,4 +96,22 @@ describe('buildAdminLineupRows', () => {
     )
     expect(rows[0].effectiveStatus).toBe('draft')
   })
+
+  it('invalidates submitted lineups that a reschedule clashes (cross-slot)', () => {
+    // Two Alpha ties now share a slot, both fielding pa — a reschedule clash.
+    const slot = '2026-02-01T10:00:00Z'
+    const rows = buildAdminLineupRows(
+      args({
+        lineups: [
+          lineup('t1', 'Alpha', 'submitted', [['pa']]),
+          lineup('t2', 'Alpha', 'submitted', [['pa']])
+        ],
+        ties: [
+          { tieId: 't1', categoryId: 'cat', scheduledStart: slot, teamIds: ['Alpha', 'Bravo'] },
+          { tieId: 't2', categoryId: 'cat', scheduledStart: slot, teamIds: ['Alpha', 'Bravo'] }
+        ]
+      })
+    )
+    expect(rows.map((r) => r.effectiveStatus)).toEqual(['invalidated', 'invalidated'])
+  })
 })
