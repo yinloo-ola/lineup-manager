@@ -117,13 +117,13 @@ export default async function globalSetup(): Promise<void> {
     }
   ])
   // A second past-cutoff tie (Bravo vs Charlie), touched ONLY by the Ticket 8
-  // admin-overwrite spec, so its state stays deterministic (independent of the
-  // parallel cutoff.spec writes to e2e-tie-past).
+  // admin-overwrite spec. Distinct time slot from e2e-tie-past so the two specs
+  // never field the same player in a shared slot (which would be a real clash).
   await restUpsert(adminToken, 'ties', [
     {
       id: 'e2e-tie-past2',
       category_id: 'e2e-cat',
-      scheduled_start: '2000-01-01T10:00:00+00:00',
+      scheduled_start: '2000-06-01T10:00:00+00:00',
       table_label: '3',
       team_a: 'e2e-b',
       team_b: 'e2e-c'

@@ -19,11 +19,18 @@ export interface LineupViolationsContext {
   teamLineups: Lineup[]
 }
 
-/** All violations for a lineup: within-tie (eligibility/pair/usage/completeness) + cross-slot. */
+/**
+ * All violations for a lineup: within-tie (eligibility/pair/usage/completeness)
+ * + cross-slot clashes. Cross-slot clashes are scoped to the tie being edited —
+ * a clash between two OTHER ties is not actionable from this lineup (it is
+ * reported when those ties are opened), so it is filtered out here.
+ */
 export function lineupViolations(lineup: Lineup, ctx: LineupViolationsContext): Violation[] {
   const within = validateLineup(ctx.tieFormat, ctx.tie, lineup, ctx.roster, { asOf: ctx.asOf })
   const otherLineups = ctx.teamLineups.filter((l) => l.tieId !== ctx.tie.id)
-  const across = findDoubleBookings([ctx.tie, ...ctx.teamTies], [lineup, ...otherLineups])
+  const across = findDoubleBookings([ctx.tie, ...ctx.teamTies], [lineup, ...otherLineups]).filter(
+    (v) => v.kind !== 'cross-slot-double-book' || v.tieIds?.includes(ctx.tie.id)
+  )
   return [...within, ...across]
 }
 
@@ -73,9 +80,6 @@ export function tryAssign(args: TryAssignArgs): TryAssignResult {
   const blocking = lineupViolations(candidate, { tieFormat, tie, roster, asOf, teamTies, teamLineups }).find((v) => {
     if (v.kind === 'incomplete-rubber') return false // partial drafts are allowed
     if (v.rubberIndex === rubberIndex) return true
-    // A cross-slot clash only blocks when THIS tie is implicated — a pre-existing
-    // clash between two OTHER ties (e.g. an admin error) must not strand the player.
-    if (v.kind === 'cross-slot-double-book') return !!v.tieIds?.includes(tie.id)
     return !!v.playerIds?.includes(playerId)
   })
 
