@@ -17,7 +17,7 @@ async function onSubmit() {
   submitting.value = true
   try {
     await auth.signIn(email.value, password.value)
-    router.push({ name: 'home' })
+    router.push({ name: auth.isManager ? 'manager' : 'home' })
   } catch (e) {
     errorMessage.value = (e as Error).message
   } finally {

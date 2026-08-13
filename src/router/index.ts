@@ -16,9 +16,15 @@ const router = createRouter({
       component: () => import('@/views/AdminHomeView.vue')
     },
     {
+      path: '/manager',
+      name: 'manager',
+      component: () => import('@/views/ManagerView.vue')
+    },
+    {
       path: '/import',
       name: 'import',
-      component: () => import('@/views/AdminImportView.vue')
+      component: () => import('@/views/AdminImportView.vue'),
+      meta: { adminOnly: true }
     },
     {
       path: '/change-password',
@@ -28,33 +34,44 @@ const router = createRouter({
     {
       path: '/provision',
       name: 'provision',
-      component: () => import('@/views/AdminProvisionView.vue')
+      component: () => import('@/views/AdminProvisionView.vue'),
+      meta: { adminOnly: true }
     },
     {
       path: '/format',
       name: 'format',
-      component: () => import('@/views/AuthorTieFormatView.vue')
+      component: () => import('@/views/AuthorTieFormatView.vue'),
+      meta: { adminOnly: true }
     }
   ]
 })
 
-// Guard: lazily init the session once, then gate non-public routes on auth,
-// and force managers with a temporary password to /change-password first.
+// Guard: init the session once, gate non-public routes on auth, force managers
+// with a temporary password to /change-password first, and keep managers on
+// /manager (admin pages are admin-only).
 router.beforeEach(async (to) => {
   const auth = useAuthStore()
   await auth.init()
+
   if (!to.meta.public && !auth.isAuthenticated) {
     return { name: 'login' }
   }
+
   if (to.name === 'login' && auth.isAuthenticated) {
-    return { name: 'home' }
+    return { name: auth.mustChangePassword ? 'change-password' : auth.isManager ? 'manager' : 'home' }
   }
+
   if (auth.isAuthenticated && auth.mustChangePassword && to.name !== 'change-password') {
     return { name: 'change-password' }
   }
-  if (to.name === 'change-password' && auth.isAuthenticated && !auth.mustChangePassword) {
-    return { name: 'home' }
+
+  if (auth.isAuthenticated && !auth.mustChangePassword) {
+    if (auth.isManager && (to.name === 'home' || to.meta.adminOnly)) return { name: 'manager' }
+    if (!auth.isManager && to.name === 'manager') return { name: 'home' }
+    if (to.name === 'change-password') return { name: auth.isManager ? 'manager' : 'home' }
   }
+
+  return undefined
 })
 
 export default router
