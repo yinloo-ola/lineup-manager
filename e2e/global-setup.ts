@@ -193,12 +193,28 @@ export default async function globalSetup(): Promise<void> {
   await completeFirstLogin(TEST_MANAGER2_EMAIL, TEST_MANAGER2_PASSWORD, TEST_MANAGER2_NEW_PASSWORD)
 }
 
-/** Set a manager's own password and clear the must-change flag (mirrors the app flow). */
+/**
+ * Set a manager's own password and clear the must-change flag (mirrors the app
+ * flow). Idempotent: a prior successful run already switched to `newPassword`,
+ * so we just re-assert the cleared flag; otherwise sign in with the temp password
+ * and switch. This keeps `npm run test:e2e` re-runnable without a `db reset`.
+ */
 async function completeFirstLogin(
   email: string,
   tempPassword: string,
   newPassword: string
 ): Promise<void> {
+  // Already completed by a prior run? Re-assert the flag (covers a prior run
+  // that set the password but died before clearing it) and return — do NOT sign
+  // in with tempPassword, which no longer works once the change has happened.
+  const existing = await signInOrNull(email, newPassword)
+  if (existing) {
+    await fetch(`${url}/rest/v1/rpc/clear_must_change_password`, {
+      method: 'POST',
+      headers: jsonHeaders(existing)
+    })
+    return
+  }
   const token = await signIn(email, tempPassword)
   const upd = await fetch(`${url}/auth/v1/user`, {
     method: 'PUT',
@@ -215,6 +231,18 @@ async function completeFirstLogin(
   if (!clr.ok) {
     throw new Error(`clear ${email} must-change failed (${clr.status}): ${await clr.text()}`)
   }
+}
+
+/** Sign in, returning the access token, or null if the credentials don't match. */
+async function signInOrNull(email: string, password: string): Promise<string | null> {
+  const res = await fetch(`${url}/auth/v1/token?grant_type=password`, {
+    method: 'POST',
+    headers: jsonHeaders(),
+    body: JSON.stringify({ email, password })
+  })
+  if (!res.ok) return null
+  const data = (await res.json()) as { access_token: string }
+  return data.access_token
 }
 
 async function provisionManager(
@@ -236,6 +264,12 @@ async function provisionManager(
     if (res.status !== 409) {
       throw new Error(`provision ${email} failed (${res.status}): ${body}`)
     }
+    // Already provisioned on a re-used stack: the user exists and may already
+    // have completed the first-login password change, so the temp `password` no
+    // longer applies. Only a fresh create (below) needs verifying — that is the
+    // only path createUser can silently fail on. completeFirstLogin converges an
+    // already-provisioned manager to the ready state regardless of its password.
+    return
   }
   // Verify the manager can actually authenticate — surfaces createUser / link
   // failures with a clear message instead of an opaque "stayed on /login" later.

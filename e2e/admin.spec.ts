@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test'
+import { apiToken, deleteLineup } from './helpers'
 import { TEST_ADMIN_EMAIL, TEST_ADMIN_PASSWORD } from './global-setup'
 
 // Ticket 8: the administrator oversight surface. The admin sees every team's
@@ -6,6 +7,14 @@ import { TEST_ADMIN_EMAIL, TEST_ADMIN_PASSWORD } from './global-setup'
 // overwrites it through the SAME validated builder a manager uses.
 
 test.describe('administrator dashboard + overwrite', () => {
+  test.beforeAll(async ({ request }) => {
+    // Start from a fresh builder on the post-cutoff tie so the spec is
+    // re-runnable without `db reset`: a prior run leaves a draft here, which
+    // changes how the builder renders and hides the "Add player" field.
+    const admin = await apiToken(request, TEST_ADMIN_EMAIL, TEST_ADMIN_PASSWORD)
+    await deleteLineup(request, admin, 'e2e-tie-past2', 'e2e-b')
+  })
+
   test('lists lineups; admin edits a post-cutoff lineup via the same rules', async ({ page }) => {
     // Sign in as the administrator (no forced password change).
     await page.goto('/login')

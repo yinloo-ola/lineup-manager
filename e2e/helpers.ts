@@ -34,6 +34,28 @@ export function authHeaders(token: string): Record<string, string> {
 }
 
 /**
+ * Delete a lineup row as an admin so a spec starts from a fresh builder. A no-op
+ * when the row is already absent (PostgREST returns 204 deleting zero rows),
+ * which is the fresh-stack case — so calling this in beforeAll is what makes a
+ * spec re-runnable without `db reset` (a prior run otherwise leaves a draft that
+ * changes how the builder renders).
+ */
+export async function deleteLineup(
+  request: APIRequestContext,
+  token: string,
+  tieId: string,
+  teamId: string
+): Promise<void> {
+  const res = await request.delete(
+    `${supabaseUrl}/rest/v1/lineups?tie_id=eq.${tieId}&team_id=eq.${teamId}`,
+    { headers: authHeaders(token) }
+  )
+  if (!res.ok()) {
+    throw new Error(`delete lineup (${tieId}, ${teamId}) failed (${res.status}): ${await res.text()}`)
+  }
+}
+
+/**
  * Sign in and land on /manager. For a manager whose first-login password change
  * has already been completed in global-setup — no forced change, so retries are
  * safe (the password is stable).

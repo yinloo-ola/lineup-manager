@@ -1,12 +1,25 @@
 import { test, expect } from '@playwright/test'
-import { signInManager } from './helpers'
-import { TEST_MANAGER2_EMAIL, TEST_MANAGER2_NEW_PASSWORD } from './global-setup'
+import { apiToken, deleteLineup, signInManager } from './helpers'
+import {
+  TEST_ADMIN_EMAIL,
+  TEST_ADMIN_PASSWORD,
+  TEST_MANAGER2_EMAIL,
+  TEST_MANAGER2_NEW_PASSWORD
+} from './global-setup'
 
 // Exercises the lineup builder end-to-end as the Bravo manager (own roster only,
 // via RLS). Uses a dedicated second manager whose password is pre-set in
 // global-setup, so it is decoupled from manager.spec's forced-change flow.
 
 test.describe('lineup builder', () => {
+  test.beforeAll(async ({ request }) => {
+    // Start from a fresh builder so the spec is re-runnable without `db reset`:
+    // a prior run leaves a draft at this (tie, team), which changes how the
+    // builder renders and hides the "Add player" field the test clicks.
+    const admin = await apiToken(request, TEST_ADMIN_EMAIL, TEST_ADMIN_PASSWORD)
+    await deleteLineup(request, admin, 'e2e-tie', 'e2e-b')
+  })
+
   test('illegal pick refused; build, submit, recall; draft persists', async ({ page }) => {
     await signInManager(page, TEST_MANAGER2_EMAIL, TEST_MANAGER2_NEW_PASSWORD)
 
