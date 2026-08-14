@@ -33,12 +33,16 @@ One scoring game within a match (table tennis: first to 11). Beyond the lineup s
 _Avoid_: point, set
 
 **Team Match Format**:
-The rules for a team event's team matches — its matches (disciplines), their player constraints, the player usage policy, and the submission lead time. One per team event.
+The rules for a team event's team matches — its matches (disciplines), their player constraints, the player usage policy, and the submission lead time. One per team event. Frozen once its tournament starts; before that, an edit that would break submitted lineups requires explicit confirmation.
 _Avoid_: tie format, ruleset, template
 
 **Lineup**:
 One team's player assignments to the matches of one team match.
 _Avoid_: submission, roster, selection
+
+**Lineup Status**:
+Where a team's lineup stands for one team match: **Submitted** or **Not submitted** — with a **Needs attention** marker in the rare case a pre-start format change broke a submitted lineup. **Locked** is not a status: it marks a team match past its cutoff.
+_Avoid_: invalidated, not-started and draft outside the lineup builder, complete/incomplete (reserved for match results)
 
 **Team Manager**:
 A user in charge of exactly one team, who authors that team's lineups.
