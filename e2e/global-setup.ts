@@ -75,29 +75,37 @@ export default async function globalSetup(): Promise<void> {
   const adminToken = await signIn(TEST_ADMIN_EMAIL, TEST_ADMIN_PASSWORD)
 
   // 2. Fixture structure (admin can write via the is_admin() RLS policies).
+  // Every fixture row is scoped to the "default" tournament explicitly — the
+  // app is tournament-aware now, so the seed-style fixture must carry the
+  // dimension too (a fresh stack has no migration-time data for 0009's backfill
+  // to catch, so without this the fixtures would be unscoped and invisible to
+  // the admin's tournament-scoped views).
+  const DEFAULT_TOUR = 'default'
+  await restUpsert(adminToken, 'tournaments', [{ id: DEFAULT_TOUR, name: 'Default' }])
   await restUpsert(adminToken, 'categories', [
-    { id: 'e2e-cat', name: "E2E Men's Team", short_name: 'EMT' },
+    { id: 'e2e-cat', tournament_id: DEFAULT_TOUR, name: "E2E Men's Team", short_name: 'EMT' },
     // Isolated category for the Ticket 9 invalidation e2e (its own format/tie so
     // tightening it cannot affect the other specs' lineups in e2e-cat).
-    { id: 'e2e-cat-inv', name: 'E2E Invalidation', short_name: 'EI' }
+    { id: 'e2e-cat-inv', tournament_id: DEFAULT_TOUR, name: 'E2E Invalidation', short_name: 'EI' }
   ])
   await restUpsert(adminToken, 'teams', [
-    { id: 'e2e-a', name: 'Alpha' },
-    { id: 'e2e-b', name: 'Bravo' },
+    { id: 'e2e-a', tournament_id: DEFAULT_TOUR, name: 'Alpha' },
+    { id: 'e2e-b', tournament_id: DEFAULT_TOUR, name: 'Bravo' },
     // Opponent for Bravo's past-cutoff tie (Ticket 7 server-side enforcement test).
-    { id: 'e2e-c', name: 'Charlie' }
+    { id: 'e2e-c', tournament_id: DEFAULT_TOUR, name: 'Charlie' }
   ])
   await restUpsert(adminToken, 'players', [
-    { id: 'e2e-p1', team_id: 'e2e-a', name: 'Alice', gender: 'F', date_of_birth: '1990-01-01' },
-    { id: 'e2e-p2', team_id: 'e2e-a', name: 'Alan', gender: 'M', date_of_birth: '1985-01-01' },
-    { id: 'e2e-p3', team_id: 'e2e-b', name: 'Bob', gender: 'M', date_of_birth: '1988-01-01' },
+    { id: 'e2e-p1', tournament_id: DEFAULT_TOUR, team_id: 'e2e-a', name: 'Alice', gender: 'F', date_of_birth: '1990-01-01' },
+    { id: 'e2e-p2', tournament_id: DEFAULT_TOUR, team_id: 'e2e-a', name: 'Alan', gender: 'M', date_of_birth: '1985-01-01' },
+    { id: 'e2e-p3', tournament_id: DEFAULT_TOUR, team_id: 'e2e-b', name: 'Bob', gender: 'M', date_of_birth: '1988-01-01' },
     // A women's player on Bravo so the lineup builder e2e has an illegal (gender) pick to attempt.
-    { id: 'e2e-p4', team_id: 'e2e-b', name: 'Barbara', gender: 'F', date_of_birth: '1992-01-01' }
+    { id: 'e2e-p4', tournament_id: DEFAULT_TOUR, team_id: 'e2e-b', name: 'Barbara', gender: 'F', date_of_birth: '1992-01-01' }
   ])
   // A tie in the far future so its cutoff is not yet reached.
   await restUpsert(adminToken, 'ties', [
     {
       id: 'e2e-tie',
+      tournament_id: DEFAULT_TOUR,
       category_id: 'e2e-cat',
       scheduled_start: '2099-01-01T10:00:00+00:00',
       table_label: '1',
@@ -110,6 +118,7 @@ export default async function globalSetup(): Promise<void> {
   await restUpsert(adminToken, 'ties', [
     {
       id: 'e2e-tie-past',
+      tournament_id: DEFAULT_TOUR,
       category_id: 'e2e-cat',
       scheduled_start: '2000-01-01T10:00:00+00:00',
       table_label: '2',
@@ -123,6 +132,7 @@ export default async function globalSetup(): Promise<void> {
   await restUpsert(adminToken, 'ties', [
     {
       id: 'e2e-tie-past2',
+      tournament_id: DEFAULT_TOUR,
       category_id: 'e2e-cat',
       scheduled_start: '2000-06-01T10:00:00+00:00',
       table_label: '3',
@@ -136,6 +146,7 @@ export default async function globalSetup(): Promise<void> {
   await restUpsert(adminToken, 'ties', [
     {
       id: 'e2e-tie-inv',
+      tournament_id: DEFAULT_TOUR,
       category_id: 'e2e-cat-inv',
       scheduled_start: '2026-12-01T10:00:00+00:00',
       table_label: '4',
@@ -146,12 +157,14 @@ export default async function globalSetup(): Promise<void> {
   await restUpsert(adminToken, 'tie_formats', [
     {
       category_id: 'e2e-cat',
+      tournament_id: DEFAULT_TOUR,
       rubbers: [{ format: 'singles', constraint: { allowedGenders: ['M'] } }],
       usage_policy: null,
       lead_time_minutes: 30
     },
     {
       category_id: 'e2e-cat-inv',
+      tournament_id: DEFAULT_TOUR,
       rubbers: [{ format: 'singles', constraint: { allowedGenders: ['M'] } }],
       usage_policy: null,
       lead_time_minutes: 30
@@ -163,6 +176,7 @@ export default async function globalSetup(): Promise<void> {
   await restUpsert(adminToken, 'lineups', [
     {
       tie_id: 'e2e-tie',
+      tournament_id: DEFAULT_TOUR,
       team_id: 'e2e-a',
       player_ids: [['e2e-p2']],
       status: 'submitted',
@@ -175,6 +189,7 @@ export default async function globalSetup(): Promise<void> {
   await restUpsert(adminToken, 'lineups', [
     {
       tie_id: 'e2e-tie-inv',
+      tournament_id: DEFAULT_TOUR,
       team_id: 'e2e-b',
       player_ids: [['e2e-p3']],
       status: 'submitted',
