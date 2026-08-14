@@ -2,6 +2,7 @@
 import { computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
+import TournamentSelector from '@/components/TournamentSelector.vue'
 
 const auth = useAuthStore()
 const router = useRouter()
@@ -18,6 +19,7 @@ async function signOut() {
   <v-container>
     <v-app-bar flat color="surface">
       <v-app-bar-title>Lineup Manager</v-app-bar-title>
+      <TournamentSelector class="mr-2" />
       <template #append>
         <v-btn variant="text" prepend-icon="mdi-logout" @click="signOut">Sign out</v-btn>
       </template>

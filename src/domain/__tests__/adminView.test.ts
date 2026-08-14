@@ -30,6 +30,7 @@ function args(extras: Partial<Parameters<typeof buildAdminLineupRows>[0]> = {}) 
     leadTimeByCategory: new Map([['cat', 30]]),
     rosterByTeam: new Map([['Alpha', [male('pa')]]]),
     formatByCategory: new Map([['cat', mensSingles]]),
+    tournamentStart: null,
     now: NOW,
     ...extras
   }

@@ -1,6 +1,8 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { onMounted, ref, watch } from 'vue'
 import { supabase } from '@/lib/supabase'
+import { useTournamentStore } from '@/stores/tournament'
+import TournamentSelector from '@/components/TournamentSelector.vue'
 import { parseTieFormat } from '@/domain/tieFormat'
 import { loadTieFormat, saveTieFormat } from '@/services/tieFormatService'
 import type { Constraint, PairRule, Rubber, RubberFormat, TieFormat, UsagePolicy } from '@/domain/types'
@@ -30,10 +32,28 @@ const saving = ref(false)
 const loadingFmt = ref(false)
 const result = ref<{ ok: boolean; message: string } | null>(null)
 
-onMounted(async () => {
-  const { data } = await supabase.from('categories').select('id, name').order('name')
+const tournaments = useTournamentStore()
+
+async function loadCategories(): Promise<void> {
+  if (!tournaments.activeId) {
+    categories.value = []
+    return
+  }
+  const { data } = await supabase
+    .from('categories')
+    .select('id, name')
+    .eq('tournament_id', tournaments.activeId)
+    .order('name')
   categories.value = (data as Category[] | null) ?? []
+}
+
+// Reset the editor when the administrator switches tournament.
+watch(() => tournaments.activeId, () => {
+  selectedCategory.value = null
+  rubbers.value = []
 })
+
+onMounted(loadCategories)
 
 function newRubber(): EditRubber {
   return { format: 'singles', male: false, female: false, ageMin: '', ageMax: '', pairRule: 'any' }
@@ -135,6 +155,7 @@ async function onSave() {
   <v-container>
     <v-app-bar flat color="surface">
       <v-app-bar-title>Author Tie Format</v-app-bar-title>
+      <TournamentSelector class="mr-2" />
       <template #append>
         <v-btn variant="text" to="/">Home</v-btn>
       </template>

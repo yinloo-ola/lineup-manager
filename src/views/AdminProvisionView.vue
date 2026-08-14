@@ -1,6 +1,8 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { onMounted, ref, watch } from 'vue'
 import { supabase } from '@/lib/supabase'
+import { useTournamentStore } from '@/stores/tournament'
+import TournamentSelector from '@/components/TournamentSelector.vue'
 
 interface Team {
   id: string
@@ -14,10 +16,27 @@ const password = ref('')
 const busy = ref(false)
 const result = ref<{ ok: boolean; message: string } | null>(null)
 
-onMounted(async () => {
-  const { data } = await supabase.from('teams').select('id, name').order('name')
+const tournaments = useTournamentStore()
+
+async function loadTeams(): Promise<void> {
+  if (!tournaments.activeId) {
+    teams.value = []
+    return
+  }
+  const { data } = await supabase
+    .from('teams')
+    .select('id, name')
+    .eq('tournament_id', tournaments.activeId)
+    .order('name')
   teams.value = (data as Team[] | null) ?? []
+}
+
+// Reset the selection when the administrator switches tournament.
+watch(() => tournaments.activeId, () => {
+  teamId.value = null
 })
+
+onMounted(loadTeams)
 
 async function onProvision() {
   result.value = null
@@ -49,6 +68,7 @@ async function onProvision() {
   <v-container>
     <v-app-bar flat color="surface">
       <v-app-bar-title>Provision manager</v-app-bar-title>
+      <TournamentSelector class="mr-2" />
       <template #append>
         <v-btn variant="text" to="/">Home</v-btn>
       </template>
