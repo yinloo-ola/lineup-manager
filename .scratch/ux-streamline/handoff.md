@@ -1,6 +1,6 @@
 # Handoff — lineup-manager: UX streamline wayfinder map (ticket 06 in flight)
 
-Date: 2026-08-15. Repo: `/Volumes/Ext/code/personal/lineup-manager` (branch `main`).
+Date: 2026-08-15. Repo: `/Volumes/Ext/code/personal/lineup-manager` (branch `feat/ux-streamline`, created from `main`).
 
 ## What this is
 
