@@ -74,3 +74,39 @@ drop policy if exists "authenticated reads tie_formats" on tie_formats;
 create policy "reads tie_formats in own tournament" on tie_formats
   for select to authenticated
   using (public.is_admin() or tournament_id = public.manager_tournament_id());
+
+-- 5. A manager's lineup write must stamp the tie's ACTUAL tournament. The
+-- Ticket 7 policies only checked team ownership, so a manager could insert a
+-- phantom (own tie, own team, foreign tournament) row — invisible to every
+-- tournament-scoped view. The tie's tournament resolver is security definer
+-- (same pattern as tie_locked/manager_team_id) so the check works regardless
+-- of the caller's RLS on ties.
+create or replace function public.tie_tournament(p_tie_id text)
+returns text
+language sql
+security definer
+set search_path = public
+as $$
+  select t.tournament_id from ties t where t.id = p_tie_id
+$$;
+
+grant execute on function public.tie_tournament(text) to authenticated;
+
+drop policy if exists "manager inserts own lineups before cutoff" on lineups;
+create policy "manager inserts own lineups before cutoff" on lineups
+  for insert to authenticated
+  with check (
+    team_id = public.manager_team_id()
+    and not public.tie_locked(tie_id)
+    and tournament_id = public.tie_tournament(tie_id)
+  );
+
+drop policy if exists "manager updates own lineups before cutoff" on lineups;
+create policy "manager updates own lineups before cutoff" on lineups
+  for update to authenticated
+  using (team_id = public.manager_team_id())
+  with check (
+    team_id = public.manager_team_id()
+    and not public.tie_locked(tie_id)
+    and tournament_id = public.tie_tournament(tie_id)
+  );

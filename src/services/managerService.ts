@@ -56,7 +56,8 @@ export async function fetchManagerData(
   // reads that aren't already team-confined — tie formats and the team-name map
   // used for opponent labels.
   const { data: tournamentId, error: tourErr } = await client.rpc('manager_tournament_id')
-  if (tourErr) throw tourErr
+  check(tourErr)
+  const tourId = (tournamentId as string | null) ?? ''
 
   const [playersRes, tiesRes, lineupsRes, formatsRes, teamsRes] = await Promise.all([
     client.from('players').select('id, name, gender, date_of_birth').eq('team_id', teamId),
@@ -68,11 +69,11 @@ export async function fetchManagerData(
     client
       .from('tie_formats')
       .select('category_id, lead_time_minutes')
-      .eq('tournament_id', tournamentId as string),
+      .eq('tournament_id', tourId),
     client
       .from('teams')
       .select('id, name')
-      .eq('tournament_id', tournamentId as string)
+      .eq('tournament_id', tourId)
   ])
   check(playersRes.error)
   check(tiesRes.error)

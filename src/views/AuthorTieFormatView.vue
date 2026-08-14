@@ -76,10 +76,13 @@ async function onCategoryChange(id: string | null) {
   rubbers.value = []
   leadTime.value = 30
   usageKind.value = 'at-most-once'
-  if (!id) return
+  // Categories only load within an active tournament (loadCategories), so a
+  // selection implies one — but narrow it locally rather than asserting.
+  const tournamentId = tournaments.activeId
+  if (!id || !tournamentId) return
   loadingFmt.value = true
   try {
-    const fmt = await loadTieFormat(supabase, tournaments.activeId!, id)
+    const fmt = await loadTieFormat(supabase, tournamentId, id)
     if (fmt) {
       leadTime.value = fmt.leadTimeMinutes ?? 30
       const up = fmt.usagePolicy
@@ -131,7 +134,8 @@ function build(): TieFormat {
 
 async function onSave() {
   result.value = null
-  if (!selectedCategory.value) return
+  const tournamentId = tournaments.activeId
+  if (!selectedCategory.value || !tournamentId) return
   let fmt: TieFormat
   try {
     fmt = parseTieFormat(build()) // validate the editor output before saving
@@ -141,7 +145,7 @@ async function onSave() {
   }
   saving.value = true
   try {
-    await saveTieFormat(supabase, tournaments.activeId!, selectedCategory.value, fmt)
+    await saveTieFormat(supabase, tournamentId, selectedCategory.value, fmt)
     result.value = { ok: true, message: `Saved ${fmt.rubbers.length} rubber(s), lead time ${fmt.leadTimeMinutes} min.` }
   } catch (e) {
     result.value = { ok: false, message: (e as Error).message }

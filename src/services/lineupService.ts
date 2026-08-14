@@ -44,6 +44,8 @@ interface TeamRow {
 
 const STATUSES: LineupStatus[] = ['not-started', 'draft', 'submitted', 'invalidated']
 
+const TIE_NOT_FOUND = 'Tie not found (it may not belong to your team).'
+
 /** Coerce a stored status string into the domain union (unknown → draft). */
 function parseStatus(status: string): LineupStatus {
   return STATUSES.includes(status as LineupStatus) ? (status as LineupStatus) : 'draft'
@@ -113,13 +115,13 @@ export async function fetchLineupBuilderData(
     .maybeSingle()
   check(tieRes.error)
   if (!tieRes.data) {
-    throw new Error('Tie not found (it may not belong to your team).')
+    throw new Error(TIE_NOT_FOUND)
   }
   const tieRow = tieRes.data as TieRow
   const isA = tieRow.team_a === teamId
   const isB = tieRow.team_b === teamId
   if (!isA && !isB) {
-    throw new Error('Tie not found (it may not belong to your team).')
+    throw new Error(TIE_NOT_FOUND)
   }
   const opponentTeamId = isA ? tieRow.team_b : tieRow.team_a
 

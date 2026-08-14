@@ -30,6 +30,24 @@ test("managers cannot read opponents' lineups (RLS isolation)", async ({ request
   expect(ownRows.length).toBeGreaterThan(0)
 })
 
+// Ticket #16 (contract): a manager's lineup write must stamp the tie's ACTUAL
+// tournament — otherwise a phantom (own tie, own team, foreign tournament) row
+// could hide from every tournament-scoped view.
+test("manager cannot write a lineup stamped with a foreign tournament", async ({ request }) => {
+  const token = await apiToken(request, TEST_MANAGER2_EMAIL, TEST_MANAGER2_NEW_PASSWORD)
+  const res = await request.post(`${supabaseUrl}/rest/v1/lineups`, {
+    headers: authHeaders(token),
+    data: {
+      tournament_id: 'e2e-tour-other',
+      tie_id: 'e2e-tie',
+      team_id: 'e2e-b',
+      player_ids: [['e2e-p3']],
+      status: 'draft'
+    }
+  })
+  expect(res.ok()).toBeFalsy()
+})
+
 // Tournament access is admin-only (Ticket #12): the Administrator can read and write
 // tournaments; a team manager can do neither.
 const TOUR_ID = 'e2e-tour-rls'
