@@ -121,6 +121,43 @@ function parseTeam(input: unknown, index: number): SeedTeam {
   return team
 }
 
+/** Milliseconds per day (UTC). */
+const MS_PER_DAY = 86_400_000
+/**
+ * Excel's serial-day epoch, anchored at 1899-12-30. That anchor absorbs Excel's
+ * famous phantom 1900-02-29, so for serial >= 60 (1900-03-01 onward — i.e. every
+ * realistic birth date) `epoch + serial days` is the exact calendar date.
+ */
+const EXCEL_EPOCH_UTC = Date.UTC(1899, 11, 30)
+
+/**
+ * Normalize a seed dateOfBirth to ISO `yyyy-mm-dd`.
+ *
+ * Accepts either an already-ISO date (kept as-is) or an Excel serial-day number
+ * (the format tournament-manager exports — e.g. 36893 -> 2001-01-02). Throws
+ * ParseError on anything else, so a bad date fails at parse time with a clear
+ * message instead of reaching Postgres as `invalid input syntax for type date`.
+ */
+function normalizeDateOfBirth(raw: string, path: string): string {
+  if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) {
+    const [y, m, d] = raw.split('-').map(Number)
+    const dt = new Date(Date.UTC(y, m - 1, d))
+    if (dt.getUTCFullYear() === y && dt.getUTCMonth() === m - 1 && dt.getUTCDate() === d) {
+      return raw // valid calendar date, already ISO
+    }
+    throw new ParseError(`${path} is not a valid calendar date ("${raw}").`)
+  }
+  if (/^\d+$/.test(raw)) {
+    const serial = Number(raw)
+    if (serial >= 60) {
+      return new Date(EXCEL_EPOCH_UTC + serial * MS_PER_DAY).toISOString().slice(0, 10)
+    }
+  }
+  throw new ParseError(
+    `${path} must be a yyyy-mm-dd date or an Excel serial number (got "${raw}").`
+  )
+}
+
 function parsePlayer(input: unknown, index: number): SeedPlayer {
   const o = object(input, `players[${index}]`)
   return {
@@ -128,7 +165,10 @@ function parsePlayer(input: unknown, index: number): SeedPlayer {
     teamId: string(o.teamId, `players[${index}].teamId`),
     name: string(o.name, `players[${index}].name`),
     gender: string(o.gender, `players[${index}].gender`),
-    dateOfBirth: string(o.dateOfBirth, `players[${index}].dateOfBirth`)
+    dateOfBirth: normalizeDateOfBirth(
+      string(o.dateOfBirth, `players[${index}].dateOfBirth`),
+      `players[${index}].dateOfBirth`
+    )
   }
 }
 

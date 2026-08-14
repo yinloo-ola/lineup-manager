@@ -120,3 +120,26 @@ describe('parseSeed — rejects malformed input', () => {
     expect(() => parseSeed(s)).toThrow(/duplicate/i)
   })
 })
+
+describe('parseSeed — dateOfBirth formats', () => {
+  const base = () => JSON.parse(JSON.stringify(validSeed))
+
+  it('normalizes an Excel-serial dateOfBirth (tournament-manager export) to yyyy-mm-dd', () => {
+    const s = base()
+    s.players[0].dateOfBirth = '36893' // Excel serial -> 2001-01-02
+    const parsed = parseSeed(s)
+    expect(parsed.players[0].dateOfBirth).toBe('2001-01-02')
+  })
+
+  it('leaves an already-ISO yyyy-mm-dd dateOfBirth untouched', () => {
+    const s = base()
+    s.players[0].dateOfBirth = '1990-01-01'
+    expect(parseSeed(s).players[0].dateOfBirth).toBe('1990-01-01')
+  })
+
+  it('rejects a dateOfBirth that is neither ISO nor a serial number', () => {
+    const s = base()
+    s.players[0].dateOfBirth = 'not-a-date'
+    expect(() => parseSeed(s)).toThrow(/dateOfBirth/)
+  })
+})
