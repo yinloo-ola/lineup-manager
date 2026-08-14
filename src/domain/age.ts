@@ -1,4 +1,16 @@
 /**
+ * The "as of" date for evaluating a rubber's age constraint in a team match.
+ *
+ * Prefers the tournament's start date — the real anchor for a constraint whose
+ * `asOf` is `'tournament-start'`. Falls back to the team match's own start date
+ * when the tournament has no `start_date`, preserving the pre-tournament-dimension
+ * behaviour. Both inputs are ISO date-times; returns a `yyyy-mm-dd` date.
+ */
+export function resolveAsOf(tournamentStart: string | null, tieStart: string): string {
+  return (tournamentStart ?? tieStart).slice(0, 10)
+}
+
+/**
  * Whole-year age of someone born on `dateOfBirth`, evaluated at `asOf`.
  * Both inputs are yyyy-mm-dd. Pure; a building block for the Ticket 2 validation engine.
  */

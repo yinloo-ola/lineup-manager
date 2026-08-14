@@ -1,4 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
+import { resolveAsOf } from '@/domain/age'
 import { computeCutoff, isLocked } from '@/domain/cutoff'
 import {
   buildAdminLineupRows,
@@ -27,6 +28,7 @@ interface TieRow {
   table_label: string | null
   team_a: string
   team_b: string
+  tournament_id: string | null
 }
 interface PlayerRow {
   id: string
@@ -102,7 +104,7 @@ export async function fetchLineupBuilderData(
   const [tieRes, playersRes, lineupRes, allTiesRes, allLineupsRes, teamsRes] = await Promise.all([
     client
       .from('ties')
-      .select('id, category_id, scheduled_start, table_label, team_a, team_b')
+      .select('id, category_id, scheduled_start, table_label, team_a, team_b, tournament_id')
       .eq('id', tieId)
       .maybeSingle(),
     client.from('players').select('id, name, gender, date_of_birth').eq('team_id', teamId),
@@ -178,8 +180,17 @@ export async function fetchLineupBuilderData(
 
   const lead = tieFormat.leadTimeMinutes ?? 30
   const cutoff = computeCutoff(tie.scheduledStart, lead)
-  // Ages default to the tie date; a rubber may override via constraint.asOf.
-  const asOf = tie.scheduledStart.slice(0, 10)
+  // Ages anchor on the tournament's start date when set ('tournament-start'); a
+  // rubber may override via constraint.asOf. Null start_date falls back to the tie.
+  const tourRes = await client
+    .from('tournaments')
+    .select('start_date')
+    .eq('id', tieRow.tournament_id)
+    .maybeSingle()
+  check(tourRes.error)
+  const tournamentStart =
+    (tourRes.data as { start_date: string | null } | null)?.start_date ?? null
+  const asOf = resolveAsOf(tournamentStart, tie.scheduledStart)
 
   return {
     tie,
@@ -256,14 +267,18 @@ interface AdminFormatDbRow {
  * state, and a re-validated effective status — the administrator oversight view.
  * Admin RLS sees all rows.
  */
-export async function fetchAdminLineups(client: SupabaseClient): Promise<AdminLineupRow[]> {
-  const [lineupsRes, teamsRes, tiesRes, catsRes, formatsRes, playersRes] = await Promise.all([
-    client.from('lineups').select('tie_id, team_id, status, player_ids, updated_at, updated_by'),
-    client.from('teams').select('id, name'),
-    client.from('ties').select('id, category_id, scheduled_start, team_a, team_b'),
-    client.from('categories').select('id, name'),
-    client.from('tie_formats').select('category_id, rubbers, usage_policy, lead_time_minutes'),
-    client.from('players').select('id, team_id, name, gender, date_of_birth')
+export async function fetchAdminLineups(
+  client: SupabaseClient,
+  tournamentId: string
+): Promise<AdminLineupRow[]> {
+  const [lineupsRes, teamsRes, tiesRes, catsRes, formatsRes, playersRes, tourRes] = await Promise.all([
+    client.from('lineups').select('tie_id, team_id, status, player_ids, updated_at, updated_by').eq('tournament_id', tournamentId),
+    client.from('teams').select('id, name').eq('tournament_id', tournamentId),
+    client.from('ties').select('id, category_id, scheduled_start, team_a, team_b').eq('tournament_id', tournamentId),
+    client.from('categories').select('id, name').eq('tournament_id', tournamentId),
+    client.from('tie_formats').select('category_id, rubbers, usage_policy, lead_time_minutes').eq('tournament_id', tournamentId),
+    client.from('players').select('id, team_id, name, gender, date_of_birth').eq('tournament_id', tournamentId),
+    client.from('tournaments').select('start_date').eq('id', tournamentId).maybeSingle()
   ])
   check(lineupsRes.error)
   check(teamsRes.error)
@@ -271,6 +286,9 @@ export async function fetchAdminLineups(client: SupabaseClient): Promise<AdminLi
   check(catsRes.error)
   check(formatsRes.error)
   check(playersRes.error)
+  check(tourRes.error)
+  const tournamentStart =
+    (tourRes.data as { start_date: string | null } | null)?.start_date ?? null
 
   const lineups: AdminLineupInput[] = (lineupsRes.data as AdminLineupDbRow[] | null ?? []).map(
     (l) => ({
@@ -321,6 +339,7 @@ export async function fetchAdminLineups(client: SupabaseClient): Promise<AdminLi
     leadTimeByCategory,
     rosterByTeam,
     formatByCategory,
+    tournamentStart,
     now: new Date().toISOString()
   })
 }

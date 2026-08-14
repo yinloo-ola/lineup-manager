@@ -4,6 +4,7 @@
 // lineup that the current structure has invalidated is flagged as such (data
 // retained — only the displayed status changes). Pure: no UI, no network.
 
+import { resolveAsOf } from './age'
 import { computeCutoff, isLocked } from './cutoff'
 import { effectiveStatus, lineupViolations } from './lineupBuilder'
 import type { Lineup, LineupStatus, Player, Tie, TieFormat } from './types'
@@ -43,12 +44,14 @@ export interface BuildAdminLineupRowsArgs {
   leadTimeByCategory: Map<string, number>
   rosterByTeam: Map<string, Player[]>
   formatByCategory: Map<string, TieFormat>
+  /** Tournament start date anchoring 'tournament-start' age rules; null = tie date. */
+  tournamentStart: string | null
   /** ISO instant at which "locked" is evaluated. */
   now: string
 }
 
 export function buildAdminLineupRows(args: BuildAdminLineupRowsArgs): AdminLineupRow[] {
-  const { lineups, ties, teamNameById, categoryNameById, leadTimeByCategory, rosterByTeam, formatByCategory, now } = args
+  const { lineups, ties, teamNameById, categoryNameById, leadTimeByCategory, rosterByTeam, formatByCategory, tournamentStart, now } = args
   const tieById = new Map(ties.map((t) => [t.tieId, t]))
   // All ties + lineups as domain shapes, so each row can be re-validated the same
   // way the builder is (within-tie + cross-slot), catching reschedule clashes too.
@@ -80,7 +83,7 @@ export function buildAdminLineupRows(args: BuildAdminLineupRowsArgs): AdminLineu
             tieFormat: fmt,
             tie: { id: tie.tieId, scheduledStart: tie.scheduledStart, teamIds: tie.teamIds },
             roster,
-            asOf: tie.scheduledStart.slice(0, 10),
+            asOf: resolveAsOf(tournamentStart, tie.scheduledStart),
             teamTies: allTies,
             teamLineups: allLineups
           }

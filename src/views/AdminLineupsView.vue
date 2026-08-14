@@ -1,11 +1,14 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { onMounted, ref, watch } from 'vue'
 import { useAuthStore } from '@/stores/auth'
+import { useTournamentStore } from '@/stores/tournament'
 import { supabase } from '@/lib/supabase'
 import { fetchAdminLineups } from '@/services/lineupService'
+import TournamentSelector from '@/components/TournamentSelector.vue'
 import type { AdminLineupRow } from '@/domain/adminView'
 
 const auth = useAuthStore()
+const tournaments = useTournamentStore()
 const rows = ref<AdminLineupRow[]>([])
 const errorMessage = ref<string | null>(null)
 
@@ -24,12 +27,16 @@ function fmt(iso: string): string {
 
 async function load(): Promise<void> {
   errorMessage.value = null
+  if (!tournaments.activeId) return
   try {
-    rows.value = await fetchAdminLineups(supabase)
+    rows.value = await fetchAdminLineups(supabase, tournaments.activeId)
   } catch (e) {
     errorMessage.value = (e as Error).message
   }
 }
+
+// Re-scope when the administrator switches tournament.
+watch(() => tournaments.activeId, load)
 
 onMounted(load)
 </script>
@@ -38,6 +45,7 @@ onMounted(load)
   <v-container>
     <v-app-bar flat color="surface">
       <v-app-bar-title>All lineups</v-app-bar-title>
+      <TournamentSelector class="mr-2" />
       <template #append>
         <v-btn variant="text" to="/">Home</v-btn>
       </template>

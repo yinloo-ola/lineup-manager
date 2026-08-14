@@ -1,0 +1,49 @@
+# Lineup Manager
+
+Team managers submit match lineups; an administrator oversees them. The work is organised around tournaments. The domain is table tennis.
+
+## Language
+
+**Tournament**:
+A single competition. Teams, team events, team matches, and lineups all belong to exactly one tournament.
+_Avoid_: season, competition, event, league
+
+**Team**:
+A club's entry in one tournament. A team belongs to exactly one tournament; the same club in another tournament is a different team.
+_Avoid_: club (a club may field several teams), squad
+
+**Player**:
+A person who belongs to exactly one team and can be named in that team's lineups.
+_Avoid_: member, athlete, roster entry
+
+**Team Event**:
+A team competition within a tournament (e.g. Men's Team). A tournament has several team events; each carries its own team match format — its format of play — and its team matches are contested between teams.
+_Avoid_: division, group, class
+
+**Team Match**:
+A team-versus-team fixture within a team event, composed of several matches.
+_Avoid_: tie, fixture, rubber-set
+
+**Match**:
+One individual discipline contest within a team match (e.g. Men's Singles, Mixed Doubles), with its own player constraints. Played as best-of-N games.
+_Avoid_: rubber, game, slot
+
+**Game**:
+One scoring game within a match (table tennis: first to 11). Beyond the lineup system, which assigns players to matches — a player plays all games of their match.
+_Avoid_: point, set
+
+**Team Match Format**:
+The rules for a team event's team matches — its matches (disciplines), their player constraints, the player usage policy, and the submission lead time. One per team event.
+_Avoid_: tie format, ruleset, template
+
+**Lineup**:
+One team's player assignments to the matches of one team match.
+_Avoid_: submission, roster, selection
+
+**Team Manager**:
+A user in charge of exactly one team, who authors that team's lineups.
+_Avoid_: coach, captain
+
+**Administrator**:
+The single operator who runs tournaments, provisions team managers, authors team match formats, and oversees every lineup.
+_Avoid_: superuser, owner

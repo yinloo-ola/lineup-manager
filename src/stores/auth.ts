@@ -2,6 +2,7 @@ import { defineStore } from 'pinia'
 import { computed, ref } from 'vue'
 import type { User } from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabase'
+import { useTournamentStore } from '@/stores/tournament'
 
 // Authentication store (Pinia, setup style). Backed by Supabase Auth.
 //
@@ -50,16 +51,32 @@ export const useAuthStore = defineStore('auth', () => {
     }
   }
 
+  /** Load (or clear) the active-tournament scope to match the session. */
+  async function syncTournamentContext(): Promise<void> {
+    const tournaments = useTournamentStore()
+    if (user.value) {
+      try {
+        await tournaments.load()
+      } catch {
+        // A tournaments read failure must not block sign-in; admin views surface it.
+      }
+    } else {
+      tournaments.clear()
+    }
+  }
+
   /** Load the existing session and subscribe to auth changes. Idempotent. */
   async function init() {
     if (!loading.value) return
     const { data } = await supabase.auth.getSession()
     user.value = data.session?.user ?? null
     await loadProfile()
+    await syncTournamentContext()
     loading.value = false
     supabase.auth.onAuthStateChange(async (_event, session) => {
       user.value = session?.user ?? null
       await loadProfile()
+      await syncTournamentContext()
     })
   }
 
@@ -75,6 +92,7 @@ export const useAuthStore = defineStore('auth', () => {
     }
     user.value = data.user
     await loadProfile()
+    await syncTournamentContext()
   }
 
   async function signOut() {
@@ -83,6 +101,7 @@ export const useAuthStore = defineStore('auth', () => {
     mustChangePassword.value = false
     teamId.value = null
     isAdmin.value = false
+    useTournamentStore().clear()
   }
 
   /** Set a new password and clear the must-change flag. */

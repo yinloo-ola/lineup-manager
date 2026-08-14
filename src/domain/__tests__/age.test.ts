@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { ageOn } from '../age'
+import { ageOn, resolveAsOf } from '../age'
 
 describe('ageOn', () => {
   it('counts whole years on the birthday', () => {
@@ -21,5 +21,19 @@ describe('ageOn', () => {
 
   it('throws on malformed input', () => {
     expect(() => ageOn('nope', '2020-01-01')).toThrow()
+  })
+})
+
+describe('resolveAsOf', () => {
+  it('uses the tournament start date when set (the real "tournament-start" anchor)', () => {
+    expect(resolveAsOf('2025-06-01T00:00:00Z', '2025-06-15T10:00:00Z')).toBe('2025-06-01')
+  })
+
+  it('falls back to the team match date when the tournament has no start date', () => {
+    expect(resolveAsOf(null, '2025-06-15T10:00:00Z')).toBe('2025-06-15')
+  })
+
+  it('returns just the yyyy-mm-dd even if inputs carry time components', () => {
+    expect(resolveAsOf('2025-06-01T09:30:00+08:00', '2025-06-15T10:00:00Z')).toBe('2025-06-01')
   })
 })
