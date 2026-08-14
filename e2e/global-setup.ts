@@ -155,6 +155,22 @@ export default async function globalSetup(): Promise<void> {
       team_b: 'e2e-c'
     }
   ])
+  // A future tie reserved for the cutoff spec's POSITIVE control (manager write
+  // must succeed before the cutoff). Distinct from e2e-tie (lineup.spec deletes
+  // and rewrites that row) and from e2e-tie-inv, so parallel specs never race
+  // on the same (tie, team) row; own time slot so cross-slot double-booking
+  // validation can't couple it to the other fixtures.
+  await restUpsert(adminToken, 'ties', [
+    {
+      id: 'e2e-tie-cut',
+      tournament_id: DEFAULT_TOUR,
+      category_id: 'e2e-cat',
+      scheduled_start: '2099-02-01T10:00:00+00:00',
+      table_label: '5',
+      team_a: 'e2e-b',
+      team_b: 'e2e-c'
+    }
+  ])
   await restUpsert(adminToken, 'tie_formats', [
     {
       category_id: 'e2e-cat',

@@ -118,6 +118,14 @@ test.describe.serial('manage & delete tournaments (#15)', () => {
     })
     expect((await res.json()) as unknown[]).toEqual([])
 
+    // Its child rows cascaded away — asserted directly (the fixture's team), not
+    // just transitively via the delete having succeeded.
+    const teams = await request.get(
+      `${supabaseUrl}/rest/v1/teams?tournament_id=eq.${TOUR_ID}&select=id`,
+      { headers: authHeaders(admin) }
+    )
+    expect((await teams.json()) as unknown[]).toEqual([])
+
     // Active fell back to another tournament: Default's lineup (Alpha) is visible.
     await page.goto('/admin/lineups')
     await expect(page.getByText('Alpha')).toBeVisible()
