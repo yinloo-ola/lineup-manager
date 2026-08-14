@@ -48,6 +48,10 @@ function moveRubber(i: number, dir: -1 | 1): void {
 }
 
 async function onCategoryChange(id: string | null) {
+  // The v-select is one-way (:model-value + @update:model-value), so the
+  // handler must commit the selection — otherwise the field stays blank and the
+  // v-if="selectedCategory" editor never renders.
+  selectedCategory.value = id
   result.value = null
   rubbers.value = []
   leadTime.value = 30
