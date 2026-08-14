@@ -79,7 +79,7 @@ async function onCategoryChange(id: string | null) {
   if (!id) return
   loadingFmt.value = true
   try {
-    const fmt = await loadTieFormat(supabase, id)
+    const fmt = await loadTieFormat(supabase, tournaments.activeId!, id)
     if (fmt) {
       leadTime.value = fmt.leadTimeMinutes ?? 30
       const up = fmt.usagePolicy
@@ -141,7 +141,7 @@ async function onSave() {
   }
   saving.value = true
   try {
-    await saveTieFormat(supabase, selectedCategory.value, fmt)
+    await saveTieFormat(supabase, tournaments.activeId!, selectedCategory.value, fmt)
     result.value = { ok: true, message: `Saved ${fmt.rubbers.length} rubber(s), lead time ${fmt.leadTimeMinutes} min.` }
   } catch (e) {
     result.value = { ok: false, message: (e as Error).message }

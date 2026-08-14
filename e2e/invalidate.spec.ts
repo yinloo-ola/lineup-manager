@@ -21,6 +21,7 @@ test('admin tightens a constraint → submitted lineup invalidated → manager s
   const tighten = await request.post(`${supabaseUrl}/rest/v1/tie_formats`, {
     headers: { ...authHeaders(token), Prefer: 'resolution=merge-duplicates,return=minimal' },
     data: {
+      tournament_id: 'default',
       category_id: 'e2e-cat-inv',
       rubbers: [{ format: 'singles', constraint: { allowedGenders: ['M'], ageMin: 40 } }],
       usage_policy: null,

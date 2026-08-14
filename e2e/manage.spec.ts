@@ -128,6 +128,6 @@ test.describe.serial('manage & delete tournaments (#15)', () => {
 
     // Active fell back to another tournament: Default's lineup (Alpha) is visible.
     await page.goto('/admin/lineups')
-    await expect(page.getByText('Alpha')).toBeVisible()
+    await expect(page.getByText('Alpha').first()).toBeVisible()
   })
 })
