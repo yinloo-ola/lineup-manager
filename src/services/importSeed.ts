@@ -1,5 +1,10 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { SeedFile } from '@/domain/seed'
+import { nameClashes } from '@/domain/tournamentManage'
+
+// The case-folded clash rule lives in the domain (shared with the rename path);
+// re-exported here for the import view + tests.
+export { nameClashes }
 
 /**
  * DB-row payloads derived from a parsed seed (camelCase domain -> snake_case columns),
@@ -33,17 +38,6 @@ export type IdFactory = () => string
 
 /** The default id source: a cryptographically-unique id (browser + Node ≥ 19). */
 const defaultIdFactory: IdFactory = () => globalThis.crypto.randomUUID()
-
-/**
- * Case-folded tournament-name clash check. The DB enforces a case-sensitive
- * UNIQUE on `tournaments.name`; this is the stricter UX guard so two names that
- * differ only by case aren't allowed to seed confusion. Pure.
- */
-export function nameClashes(desiredName: string, existingNames: string[]): boolean {
-  const want = desiredName.trim().toLowerCase()
-  if (want === '') return false
-  return existingNames.some((n) => n.trim().toLowerCase() === want)
-}
 
 /**
  * Assign a fresh id to every seed entity, returning a seed-id -> fresh-id map.

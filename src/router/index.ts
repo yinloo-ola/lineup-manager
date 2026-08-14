@@ -53,6 +53,12 @@ const router = createRouter({
       name: 'format',
       component: () => import('@/views/AuthorTieFormatView.vue'),
       meta: { adminOnly: true }
+    },
+    {
+      path: '/manage',
+      name: 'manage',
+      component: () => import('@/views/AdminManageView.vue'),
+      meta: { adminOnly: true }
     }
   ]
 })
