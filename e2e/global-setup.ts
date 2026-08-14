@@ -5,8 +5,9 @@
 // REAL provision-manager edge function — exercising the actual provisioning
 // path (service_role lives inside the function, never in test code).
 //
-// CI runs against a fresh stack each time. For local re-runs, reset first:
-//   supabase db reset && npm run test:e2e
+// CI runs against a fresh stack each time. Local re-runs need no db reset: the
+// setup converges state (upserts by id, manager first-login states reset or
+// completed) so the suite is re-runnable against a used stack.
 
 import { supabaseUrl as url, supabaseAnonKey as anonKey } from './helpers'
 
@@ -202,6 +203,13 @@ export default async function globalSetup(): Promise<void> {
   await provisionManager(adminToken, TEST_MANAGER_EMAIL, TEST_MANAGER_PASSWORD, 'e2e-a')
   await provisionManager(adminToken, TEST_MANAGER2_EMAIL, TEST_MANAGER2_PASSWORD, 'e2e-b')
 
+  // 3b. Converge manager1 back to the forced-first-login state. manager.spec is
+  // destructive — it COMPLETES the password change — so a re-run without a db
+  // reset would otherwise find the temp password consumed and fail at sign-in.
+  // This restores must_change_password and the temp password, making every run
+  // exercise the same forced-change flow.
+  await resetFirstLogin(adminToken, TEST_MANAGER_EMAIL, TEST_MANAGER_PASSWORD, TEST_MANAGER_NEW_PASSWORD)
+
   // 4. Complete manager2's first-login password change now, so the lineup builder
   // e2e can sign straight in to /manager. This decouples it from manager.spec's
   // destructive forced-change flow (and from retry-after-password-change).
@@ -258,6 +266,42 @@ async function signInOrNull(email: string, password: string): Promise<string | n
   if (!res.ok) return null
   const data = (await res.json()) as { access_token: string }
   return data.access_token
+}
+
+/**
+ * Converge a manager to the forced-first-login state (temp password +
+ * must_change_password=true) so the destructive manager.spec can run the
+ * forced-change flow afresh on every run. Idempotent: on a fresh stack the
+ * temp password already works; after a prior run consumed it, sign in with the
+ * new password and set it back to the temp one (the user may change their own
+ * password; secure_password_change is off locally). The flag is re-asserted
+ * via an admin PATCH either way, covering a prior run that changed the
+ * password but died before the app cleared it.
+ */
+async function resetFirstLogin(
+  adminToken: string,
+  email: string,
+  tempPassword: string,
+  newPassword: string
+): Promise<void> {
+  const flag = await fetch(`${url}/rest/v1/team_managers?email=eq.${encodeURIComponent(email)}`, {
+    method: 'PATCH',
+    headers: { ...jsonHeaders(adminToken), Prefer: 'return=minimal' },
+    body: JSON.stringify({ must_change_password: true })
+  })
+  if (!flag.ok) {
+    throw new Error(`reset ${email} must-change flag failed (${flag.status}): ${await flag.text()}`)
+  }
+  if (await signInOrNull(email, tempPassword)) return // already converged
+  const token = await signIn(email, newPassword)
+  const upd = await fetch(`${url}/auth/v1/user`, {
+    method: 'PUT',
+    headers: jsonHeaders(token),
+    body: JSON.stringify({ password: tempPassword })
+  })
+  if (!upd.ok) {
+    throw new Error(`reset ${email} password failed (${upd.status}): ${await upd.text()}`)
+  }
 }
 
 async function provisionManager(
