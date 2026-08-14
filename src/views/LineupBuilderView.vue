@@ -165,7 +165,7 @@ async function onSave(): Promise<void> {
   busy.value = true
   feedback.value = null
   try {
-    await saveLineupDraft(supabase, w)
+    await saveLineupDraft(supabase, w, d.tournamentId)
     await load()
     feedback.value = { kind: 'success', text: 'Draft saved.' }
   } catch (e) {
@@ -182,7 +182,7 @@ async function onSubmit(): Promise<void> {
   busy.value = true
   feedback.value = null
   try {
-    await submitLineup(supabase, w)
+    await submitLineup(supabase, w, d.tournamentId)
     await load()
     feedback.value = { kind: 'success', text: 'Lineup submitted.' }
   } catch (e) {
@@ -199,7 +199,7 @@ async function onRecall(): Promise<void> {
   busy.value = true
   feedback.value = null
   try {
-    await saveLineupDraft(supabase, w)
+    await saveLineupDraft(supabase, w, d.tournamentId)
     await load()
     feedback.value = { kind: 'success', text: 'Lineup recalled to draft.' }
   } catch (e) {

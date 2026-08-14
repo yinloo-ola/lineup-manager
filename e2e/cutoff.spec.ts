@@ -30,7 +30,7 @@ test('server refuses manager lineup writes at/after the cutoff', async ({ reques
   // must refuse this on the server, regardless of any client clock.
   const res = await request.post(`${supabaseUrl}/rest/v1/lineups`, {
     headers: upsertHeaders(token),
-    data: { tie_id: 'e2e-tie-past', team_id: 'e2e-b', player_ids: [['e2e-p3']], status: 'draft' }
+    data: { tournament_id: 'default', tie_id: 'e2e-tie-past', team_id: 'e2e-b', player_ids: [['e2e-p3']], status: 'draft' }
   })
   // Refused SPECIFICALLY by the RLS policy (42501), not by a malformed payload
   // or an auth failure — those would pass a bare ok() check for the wrong reason.
@@ -48,7 +48,7 @@ test('server still accepts manager lineup writes before the cutoff (positive con
   const token = await apiToken(request, TEST_MANAGER2_EMAIL, TEST_MANAGER2_NEW_PASSWORD)
   const res = await request.post(`${supabaseUrl}/rest/v1/lineups`, {
     headers: upsertHeaders(token),
-    data: { tie_id: 'e2e-tie-cut', team_id: 'e2e-b', player_ids: [['e2e-p3']], status: 'draft' }
+    data: { tournament_id: 'default', tie_id: 'e2e-tie-cut', team_id: 'e2e-b', player_ids: [['e2e-p3']], status: 'draft' }
   })
   expect(res.ok()).toBeTruthy()
 })
@@ -59,7 +59,7 @@ test('admin may still edit after the cutoff (no-reopen: admin-only)', async ({ r
 
   const res = await request.post(`${supabaseUrl}/rest/v1/lineups`, {
     headers: upsertHeaders(token),
-    data: { tie_id: 'e2e-tie-past', team_id: 'e2e-b', player_ids: [['e2e-p3']], status: 'submitted' }
+    data: { tournament_id: 'default', tie_id: 'e2e-tie-past', team_id: 'e2e-b', player_ids: [['e2e-p3']], status: 'submitted' }
   })
   expect(res.ok()).toBeTruthy()
 

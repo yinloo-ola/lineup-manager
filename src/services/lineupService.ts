@@ -28,7 +28,7 @@ interface TieRow {
   table_label: string | null
   team_a: string
   team_b: string
-  tournament_id: string | null
+  tournament_id: string
 }
 interface PlayerRow {
   id: string
@@ -43,6 +43,8 @@ interface TeamRow {
 }
 
 const STATUSES: LineupStatus[] = ['not-started', 'draft', 'submitted', 'invalidated']
+
+const TIE_NOT_FOUND = 'Tie not found (it may not belong to your team).'
 
 /** Coerce a stored status string into the domain union (unknown → draft). */
 function parseStatus(status: string): LineupStatus {
@@ -73,6 +75,8 @@ function reconcile(lineup: Lineup, tieFormat: TieFormat): Lineup {
 export interface LineupBuilderData {
   tie: Tie
   categoryId: string
+  /** The tie's tournament — callers pass it back on save/submit (writes stamp it). */
+  tournamentId: string
   opponentTeamId: string
   opponentName: string
   myTeamName: string
@@ -101,12 +105,27 @@ export async function fetchLineupBuilderData(
   tieId: string,
   teamId: string
 ): Promise<LineupBuilderData> {
-  const [tieRes, playersRes, lineupRes, allTiesRes, allLineupsRes, teamsRes] = await Promise.all([
-    client
-      .from('ties')
-      .select('id, category_id, scheduled_start, table_label, team_a, team_b, tournament_id')
-      .eq('id', tieId)
-      .maybeSingle(),
+  // The tie first — its tournament_id scopes every other read (name maps, the
+  // team's other ties/lineups) so cross-tournament rows can never leak into
+  // opponent names or cross-slot clash detection.
+  const tieRes = await client
+    .from('ties')
+    .select('id, category_id, scheduled_start, table_label, team_a, team_b, tournament_id')
+    .eq('id', tieId)
+    .maybeSingle()
+  check(tieRes.error)
+  if (!tieRes.data) {
+    throw new Error(TIE_NOT_FOUND)
+  }
+  const tieRow = tieRes.data as TieRow
+  const isA = tieRow.team_a === teamId
+  const isB = tieRow.team_b === teamId
+  if (!isA && !isB) {
+    throw new Error(TIE_NOT_FOUND)
+  }
+  const opponentTeamId = isA ? tieRow.team_b : tieRow.team_a
+
+  const [playersRes, lineupRes, allTiesRes, allLineupsRes, teamsRes] = await Promise.all([
     client.from('players').select('id, name, gender, date_of_birth').eq('team_id', teamId),
     client
       .from('lineups')
@@ -117,32 +136,22 @@ export async function fetchLineupBuilderData(
     client
       .from('ties')
       .select('id, category_id, scheduled_start, table_label, team_a, team_b')
+      .eq('tournament_id', tieRow.tournament_id)
       .or(`team_a.eq.${teamId},team_b.eq.${teamId}`),
     client
       .from('lineups')
       .select('tie_id, team_id, player_ids, status, submitted_at, updated_at')
+      .eq('tournament_id', tieRow.tournament_id)
       .eq('team_id', teamId),
-    client.from('teams').select('id, name')
+    client.from('teams').select('id, name').eq('tournament_id', tieRow.tournament_id)
   ])
-  check(tieRes.error)
   check(playersRes.error)
   check(lineupRes.error)
   check(allTiesRes.error)
   check(allLineupsRes.error)
   check(teamsRes.error)
 
-  if (!tieRes.data) {
-    throw new Error('Tie not found (it may not belong to your team).')
-  }
-  const tieRow = tieRes.data as TieRow
-  const isA = tieRow.team_a === teamId
-  const isB = tieRow.team_b === teamId
-  if (!isA && !isB) {
-    throw new Error('Tie not found (it may not belong to your team).')
-  }
-  const opponentTeamId = isA ? tieRow.team_b : tieRow.team_a
-
-  const tieFormat = await loadTieFormat(client, tieRow.category_id)
+  const tieFormat = await loadTieFormat(client, tieRow.tournament_id, tieRow.category_id)
   if (!tieFormat) {
     throw new Error('No Tie Format has been authored for this category yet.')
   }
@@ -195,6 +204,7 @@ export async function fetchLineupBuilderData(
   return {
     tie,
     categoryId: tieRow.category_id,
+    tournamentId: tieRow.tournament_id,
     opponentTeamId,
     opponentName: teamNameById.get(opponentTeamId) ?? opponentTeamId,
     myTeamName: teamNameById.get(teamId) ?? teamId,
@@ -210,22 +220,25 @@ export async function fetchLineupBuilderData(
 }
 
 /** Upsert a lineup row with a given status (RLS: own team; server-side cutoff).
+ *  tournament_id is stamped on the write (NOT NULL since the contract step) and
  *  updated_at/updated_by are stamped by the 0008 trigger (server-side). */
 async function upsertLineup(
   client: SupabaseClient,
   lineup: Lineup,
+  tournamentId: string,
   status: LineupStatus,
   submittedAt: string | null
 ): Promise<void> {
   const { error } = await client.from('lineups').upsert(
     {
+      tournament_id: tournamentId,
       tie_id: lineup.tieId,
       team_id: lineup.teamId,
       player_ids: lineup.playerIds,
       status,
       submitted_at: submittedAt
     },
-    { onConflict: 'tie_id,team_id' }
+    { onConflict: 'tournament_id,tie_id,team_id' }
   )
   if (error) throw error
 }
@@ -234,8 +247,12 @@ async function upsertLineup(
  * Persist a lineup as a draft. Also serves as Recall (a submitted lineup
  * returned to draft is the same write). Server enforces the cutoff.
  */
-export async function saveLineupDraft(client: SupabaseClient, lineup: Lineup): Promise<void> {
-  await upsertLineup(client, lineup, 'draft', null)
+export async function saveLineupDraft(
+  client: SupabaseClient,
+  lineup: Lineup,
+  tournamentId: string
+): Promise<void> {
+  await upsertLineup(client, lineup, tournamentId, 'draft', null)
 }
 
 /**
@@ -243,8 +260,12 @@ export async function saveLineupDraft(client: SupabaseClient, lineup: Lineup): P
  * ensure the lineup is complete + valid (canSubmit); the server enforces the
  * cutoff (refuses at/after — no reopen; admin edits via the admin policy).
  */
-export async function submitLineup(client: SupabaseClient, lineup: Lineup): Promise<void> {
-  await upsertLineup(client, lineup, 'submitted', new Date().toISOString())
+export async function submitLineup(
+  client: SupabaseClient,
+  lineup: Lineup,
+  tournamentId: string
+): Promise<void> {
+  await upsertLineup(client, lineup, tournamentId, 'submitted', new Date().toISOString())
 }
 
 interface AdminLineupDbRow {

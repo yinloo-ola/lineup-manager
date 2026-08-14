@@ -32,3 +32,10 @@ its provisioned managers' auth accounts.
   double-confirms and enumerates the consequences (incl. manager accounts cleared).
 - `tie_formats` uniqueness widens to `(tournament_id, category_id)`; `tournaments.start_date`
   anchors the `asOf:'tournament-start'` age check (previously it misused each tie's own date).
+- **Contract step refinement (migration 0011):** within-tournament uniqueness is enforced
+  as composite UNIQUE `(tournament_id, id)` indexes, but teams, categories, and ties keep
+  their *global*-id primary keys (lineups and tie formats take the composite as their PK).
+  A bare team id is what `team_managers` (the 1:1 manager↔team binding) and every manager
+  RLS policy key on, so letting a team id recur across tournaments would make "the
+  manager's team" ambiguous. The import therefore continues minting fresh ids per
+  tournament; per-tournament id recurrence for teams was considered and rejected.

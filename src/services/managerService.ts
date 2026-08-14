@@ -52,6 +52,13 @@ export async function fetchManagerData(
   client: SupabaseClient,
   teamId: string
 ): Promise<ManagerData> {
+  // The manager's one tournament (RLS: they see exactly their own) scopes the
+  // reads that aren't already team-confined — tie formats and the team-name map
+  // used for opponent labels.
+  const { data: tournamentId, error: tourErr } = await client.rpc('manager_tournament_id')
+  check(tourErr)
+  const tourId = (tournamentId as string | null) ?? ''
+
   const [playersRes, tiesRes, lineupsRes, formatsRes, teamsRes] = await Promise.all([
     client.from('players').select('id, name, gender, date_of_birth').eq('team_id', teamId),
     client
@@ -59,8 +66,14 @@ export async function fetchManagerData(
       .select('id, category_id, scheduled_start, table_label, team_a, team_b')
       .or(`team_a.eq.${teamId},team_b.eq.${teamId}`),
     client.from('lineups').select('tie_id, status').eq('team_id', teamId),
-    client.from('tie_formats').select('category_id, lead_time_minutes'),
-    client.from('teams').select('id, name')
+    client
+      .from('tie_formats')
+      .select('category_id, lead_time_minutes')
+      .eq('tournament_id', tourId),
+    client
+      .from('teams')
+      .select('id, name')
+      .eq('tournament_id', tourId)
   ])
   check(playersRes.error)
   check(tiesRes.error)

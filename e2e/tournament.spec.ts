@@ -27,7 +27,7 @@ test.describe('multi-tournament', () => {
 
     await page.goto('/admin/lineups')
     // "Default" holds the global-setup fixture (Alpha has a submitted lineup).
-    await expect(page.getByText('Alpha')).toBeVisible()
+    await expect(page.getByText('Alpha').first()).toBeVisible()
 
     // Switch to the other tournament — its lineups view re-scopes to empty.
     await page.getByLabel('Tournament').click({ force: true })
