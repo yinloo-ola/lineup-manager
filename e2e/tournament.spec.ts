@@ -23,7 +23,8 @@ test.describe('multi-tournament', () => {
     await page.getByRole('textbox', { name: /email/i }).fill(TEST_ADMIN_EMAIL)
     await page.getByRole('textbox', { name: /password/i }).fill(TEST_ADMIN_PASSWORD)
     await page.getByRole('button', { name: /sign in/i }).click()
-    await expect(page).toHaveURL(/\/$/)
+    // Setup-aware landing: a tournament exists → Matches.
+    await expect(page).toHaveURL(/\/matches$/)
 
     await page.goto('/admin/lineups')
     // "Default" holds the global-setup fixture (Alpha has a submitted lineup).

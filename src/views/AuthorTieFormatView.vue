@@ -2,7 +2,6 @@
 import { onMounted, ref, watch } from 'vue'
 import { supabase } from '@/lib/supabase'
 import { useTournamentStore } from '@/stores/tournament'
-import TournamentSelector from '@/components/TournamentSelector.vue'
 import { parseTieFormat } from '@/domain/tieFormat'
 import { loadTieFormat, saveTieFormat } from '@/services/tieFormatService'
 import type { Constraint, PairRule, Rubber, RubberFormat, TieFormat, UsagePolicy } from '@/domain/types'
@@ -157,14 +156,6 @@ async function onSave() {
 
 <template>
   <v-container>
-    <v-app-bar flat color="surface">
-      <v-app-bar-title>Author Tie Format</v-app-bar-title>
-      <TournamentSelector class="mr-2" />
-      <template #append>
-        <v-btn variant="text" to="/">Home</v-btn>
-      </template>
-    </v-app-bar>
-
     <v-row class="mt-4">
       <v-col>
         <v-card elevation="2" rounded="lg">

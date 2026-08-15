@@ -1,13 +1,10 @@
 <script setup lang="ts">
 import { onMounted, ref, watch } from 'vue'
-import { useAuthStore } from '@/stores/auth'
 import { useTournamentStore } from '@/stores/tournament'
 import { supabase } from '@/lib/supabase'
 import { fetchAdminLineups } from '@/services/lineupService'
-import TournamentSelector from '@/components/TournamentSelector.vue'
 import type { AdminLineupRow } from '@/domain/adminView'
 
-const auth = useAuthStore()
 const tournaments = useTournamentStore()
 const rows = ref<AdminLineupRow[]>([])
 const errorMessage = ref<string | null>(null)
@@ -43,14 +40,6 @@ onMounted(load)
 
 <template>
   <v-container>
-    <v-app-bar flat color="surface">
-      <v-app-bar-title>All lineups</v-app-bar-title>
-      <TournamentSelector class="mr-2" />
-      <template #append>
-        <v-btn variant="text" to="/">Home</v-btn>
-      </template>
-    </v-app-bar>
-
     <v-alert v-if="errorMessage" type="error" variant="tonal" class="mt-4">
       {{ errorMessage }}
     </v-alert>

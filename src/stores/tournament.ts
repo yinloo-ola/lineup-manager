@@ -10,6 +10,8 @@ export interface Tournament {
   id: string
   name: string
   startDate: string | null
+  /** Date part of the tournament's last scheduled team match; null when none. */
+  lastStart: string | null
 }
 
 const LS_KEY = 'lineup.activeTournamentId'
@@ -18,6 +20,7 @@ interface TournamentRow {
   id: string
   name: string
   start_date: string | null
+  ties: { scheduled_start: string }[] | null
 }
 
 export const useTournamentStore = defineStore('tournament', () => {
@@ -38,19 +41,25 @@ export const useTournamentStore = defineStore('tournament', () => {
    * Load the tournaments visible to the caller — all of them for an admin
    * (admin RLS), just their own for a manager (manager-own-tournament policy).
    * Resolves the active id: keep the persisted choice if still valid, else the
-   * first available; clears it when there are none.
+   * first available; clears it when there are none. The nested ties select
+   * carries each tournament's last scheduled team match (the selector's
+   * past-tournament rule — a start date alone can't tell running from past).
    */
   async function load(): Promise<void> {
     const { data, error } = await supabase
       .from('tournaments')
-      .select('id, name, start_date')
+      .select('id, name, start_date, ties(scheduled_start)')
       .order('name')
     if (error) throw error
-    tournaments.value = ((data as TournamentRow[] | null) ?? []).map((r) => ({
-      id: r.id,
-      name: r.name,
-      startDate: r.start_date
-    }))
+    tournaments.value = ((data as TournamentRow[] | null) ?? []).map((r) => {
+      const starts = (r.ties ?? []).map((t) => t.scheduled_start.slice(0, 10)).sort()
+      return {
+        id: r.id,
+        name: r.name,
+        startDate: r.start_date,
+        lastStart: starts.length > 0 ? starts[starts.length - 1] : null
+      }
+    })
 
     const ids = new Set(tournaments.value.map((t) => t.id))
     if (activeId.value && ids.has(activeId.value)) return

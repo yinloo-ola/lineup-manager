@@ -3,7 +3,6 @@ import { computed, ref } from 'vue'
 import { supabase } from '@/lib/supabase'
 import { useTournamentStore, type Tournament } from '@/stores/tournament'
 import { renameError } from '@/domain/tournamentManage'
-import TournamentSelector from '@/components/TournamentSelector.vue'
 
 // Ticket #15: the Administrator manages tournaments — rename (uniqueness-checked),
 // set/edit start date, and delete (cascade + manager-account cleanup). Delete is
@@ -164,14 +163,6 @@ function fmtDate(d: string | null): string {
 
 <template>
   <v-container>
-    <v-app-bar flat color="surface">
-      <v-app-bar-title>Manage tournaments</v-app-bar-title>
-      <TournamentSelector class="mr-2" />
-      <template #append>
-        <v-btn variant="text" to="/">Home</v-btn>
-      </template>
-    </v-app-bar>
-
     <v-alert
       v-if="result"
       :type="result.ok ? 'success' : 'error'"
@@ -219,7 +210,7 @@ function fmtDate(d: string | null): string {
       </v-list>
       <v-card-text v-else class="text-center text-medium-emphasis pa-8">
         No tournaments yet —
-        <v-btn variant="text" color="primary" to="/import">import one to get started</v-btn>.
+        <v-btn variant="text" color="primary" to="/setup">import one to get started</v-btn>.
       </v-card-text>
     </v-card>
 

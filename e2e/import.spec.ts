@@ -2,17 +2,26 @@ import { test, expect } from '@playwright/test'
 import { apiToken, authHeaders, supabaseUrl } from './helpers'
 import { TEST_ADMIN_EMAIL, TEST_ADMIN_PASSWORD } from './global-setup'
 
-// Issue #14: importing a seed always creates a NEW tournament (named from
-// tournamentName), stamps the new tournament's id onto every imported row, and
-// surfaces a rename field when the name clashes. The new tournament then appears
-// in the selector and its data shows in the scoped views.
+// Issue #14 / ticket 13: importing a tournament (the selector's "Import
+// tournament…" dialog — import IS the create action) always creates a NEW
+// tournament, stamps the new tournament's id onto every imported row, and
+// surfaces a rename field when the name clashes.
 
 async function signInAdmin(page: import('@playwright/test').Page): Promise<void> {
   await page.goto('/login')
   await page.getByRole('textbox', { name: /email/i }).fill(TEST_ADMIN_EMAIL)
   await page.getByRole('textbox', { name: /password/i }).fill(TEST_ADMIN_PASSWORD)
   await page.getByRole('button', { name: /sign in/i }).click()
-  await expect(page).toHaveURL(/\/$/)
+  // Setup-aware landing: the e2e fixture's "Default" tournament exists, so the
+  // admin lands on Matches.
+  await expect(page).toHaveURL(/\/matches$/)
+}
+
+/** Open the import dialog from the tournament selector's trailing entry. */
+async function openImportDialog(page: import('@playwright/test').Page): Promise<void> {
+  await page.getByLabel('Tournament').click()
+  await page.getByRole('option', { name: /import tournament…/i }).click()
+  await expect(page.getByRole('dialog')).toBeVisible()
 }
 
 /** A minimal valid v1 seed whose ids are stable (the import remints them anyway). */
@@ -42,20 +51,20 @@ function seedJson(tournamentName: string): string {
   })
 }
 
-test.describe('seed import → new tournament', () => {
+test.describe('tournament import (selector dialog) → new tournament', () => {
   test('creates a new tournament, selects it, and its teams show in a scoped view', async ({
     page
   }) => {
     // Unique name per run so the happy path never clashes with a prior run.
     const name = `E2E Import ${Date.now()}`
     await signInAdmin(page)
-    await page.goto('/import')
+    await openImportDialog(page)
 
     await page.getByLabel('Tournament JSON').fill(seedJson(name))
     await page.getByRole('button', { name: /parse & import/i }).click()
     await expect(page.getByText(/created —/)).toBeVisible()
 
-    // The new tournament is auto-selected; its imported teams appear under /provision.
+    // The new tournament is auto-selected; its imported teams appear under provisioning.
     await page.goto('/provision')
     // The selector reflects the freshly created + selected tournament.
     await expect(page.getByText(name)).toBeVisible()
@@ -69,7 +78,7 @@ test.describe('seed import → new tournament', () => {
     page
   }) => {
     await signInAdmin(page)
-    await page.goto('/import')
+    await openImportDialog(page)
 
     // "Default" is created by the e2e fixture setup, so this name always clashes.
     await page.getByLabel('Tournament JSON').fill(seedJson('Default'))
@@ -98,7 +107,7 @@ test.describe('seed import → new tournament', () => {
     const first = `E2E Reimport A ${Date.now()}`
     const second = `E2E Reimport B ${Date.now()}`
     await signInAdmin(page)
-    await page.goto('/import')
+    await openImportDialog(page)
 
     // First import: straight through.
     await page.getByLabel('Tournament JSON').fill(seedJson(first))

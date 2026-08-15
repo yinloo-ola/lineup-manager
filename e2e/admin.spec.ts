@@ -21,11 +21,13 @@ test.describe('administrator dashboard + overwrite', () => {
     await page.getByRole('textbox', { name: /email/i }).fill(TEST_ADMIN_EMAIL)
     await page.getByRole('textbox', { name: /password/i }).fill(TEST_ADMIN_PASSWORD)
     await page.getByRole('button', { name: /sign in/i }).click()
-    await expect(page.getByText('Administrator home')).toBeVisible()
+    // Setup-aware landing: a tournament exists → the Matches area.
+    await expect(page).toHaveURL(/\/matches$/)
+    await expect(page.getByText('Matches').first()).toBeVisible()
 
-    // Dashboard lists lineups (the pre-created Alpha lineup guarantees a row).
+    // The oversight table lists lineups (the pre-created Alpha lineup guarantees a row).
     await page.goto('/admin/lineups')
-    await expect(page.getByText('All lineups')).toBeVisible()
+    await expect(page.getByText('Administrator oversight')).toBeVisible()
     await expect(page.getByText('Alpha').first()).toBeVisible()
 
     // Open the isolated post-cutoff tie as an administrator (on behalf of Bravo).

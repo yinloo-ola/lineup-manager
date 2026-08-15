@@ -23,7 +23,8 @@ async function signInAdmin(page: import('@playwright/test').Page): Promise<void>
   await page.getByRole('textbox', { name: /email/i }).fill(TEST_ADMIN_EMAIL)
   await page.getByRole('textbox', { name: /password/i }).fill(TEST_ADMIN_PASSWORD)
   await page.getByRole('button', { name: /sign in/i }).click()
-  await expect(page).toHaveURL(/\/$/)
+  // Setup-aware landing: a tournament exists → Matches.
+  await expect(page).toHaveURL(/\/matches$/)
 }
 
 test.describe.serial('manage & delete tournaments (#15)', () => {
@@ -92,7 +93,8 @@ test.describe.serial('manage & delete tournaments (#15)', () => {
     // Make the soon-to-be-deleted tournament the ACTIVE one, so fall-back is exercised.
     await page.goto('/manage')
     await page.getByRole('combobox', { name: 'Tournament' }).click({ force: true })
-    await page.getByRole('option', { name: RENAMED, exact: true }).click()
+    // The selector's options carry a start-date subtitle, so match on the name.
+    await page.getByRole('option', { name: RENAMED, exact: false }).click()
 
     // Open the delete dialog and complete the double-confirm gate.
     await page.getByRole('button', { name: `Delete ${RENAMED}`, exact: true }).click()
