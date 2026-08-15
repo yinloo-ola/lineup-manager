@@ -38,15 +38,18 @@ export interface ProvisionSummary {
 }
 
 export function provisionSummary(teams: ProvisionTeam[]): ProvisionSummary {
-  const states = teams.map(provisionState)
-  const notProvisioned = states.filter((s) => s === 'not-provisioned').length
-  const mustChangePassword = states.filter((s) => s === 'must-change-password').length
+  const counts: Record<ProvisionState, number> = {
+    active: 0,
+    'must-change-password': 0,
+    'not-provisioned': 0
+  }
+  for (const t of teams) counts[provisionState(t)]++
   return {
     total: teams.length,
-    active: states.filter((s) => s === 'active').length,
-    mustChangePassword,
-    notProvisioned,
-    allProvisioned: notProvisioned === 0
+    active: counts.active,
+    mustChangePassword: counts['must-change-password'],
+    notProvisioned: counts['not-provisioned'],
+    allProvisioned: counts['not-provisioned'] === 0
   }
 }
 

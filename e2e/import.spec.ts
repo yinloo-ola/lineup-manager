@@ -101,7 +101,7 @@ test.describe('tournament import (selector dialog) → new tournament', () => {
         headers: authHeaders(admin),
         data: { tournamentId: mine.id }
       })
-      expect(del.ok()).toBeTruthy()
+      expect(del.status()).toBe(200)
     }
   })
 

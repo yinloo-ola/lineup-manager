@@ -28,9 +28,14 @@ const STATE_PRESENTATION = {
   'not-provisioned': { label: 'Not provisioned yet', color: 'grey' }
 } as const
 
-function stateOf(t: ProvisionTeam): { label: string; color: string } {
-  return STATE_PRESENTATION[provisionState(t)]
-}
+/** Teams joined with their derived state + presentation, once per reload. */
+const rows = computed(() =>
+  teams.value.map((t) => ({
+    team: t,
+    state: provisionState(t),
+    presentation: STATE_PRESENTATION[provisionState(t)]
+  }))
+)
 
 // --- the provision dialog (one team at a time) ---
 const dialogTeam = ref<ProvisionTeam | null>(null)
@@ -56,16 +61,11 @@ function openDialog(t: ProvisionTeam): void {
 
 async function onProvision(): Promise<void> {
   const t = dialogTeam.value
-  if (!t || emailError.value || !password.value) return
+  const tournamentId = tournaments.activeId
+  if (!t || !tournamentId || emailError.value || !password.value) return
   busy.value = true
   try {
-    // A corrected email is persisted back to the team (the seeded value stays
-    // canonical for future imports/reads).
     const corrected = email.value.trim()
-    if (corrected !== (t.managerEmail ?? '')) {
-      if (!tournaments.activeId) return
-      await updateTeamManagerEmail(supabase, tournaments.activeId, t.teamId, corrected)
-    }
     const { data, error } = await supabase.functions.invoke<{
       ok?: boolean
       error?: string
@@ -80,6 +80,11 @@ async function onProvision(): Promise<void> {
     if (data?.error) {
       result.value = { ok: false, message: data.error }
       return
+    }
+    // Persist a corrected email only after the account exists, so a failed
+    // provisioning never overwrites the seeded value.
+    if (corrected !== (t.managerEmail ?? '')) {
+      await updateTeamManagerEmail(supabase, tournamentId, t.teamId, corrected)
     }
     dialogTeam.value = null
     result.value = {
@@ -160,24 +165,24 @@ onMounted(load)
             </tr>
           </thead>
           <tbody>
-            <tr v-for="t in teams" :key="t.teamId">
-              <td>{{ t.teamName }}</td>
+            <tr v-for="r in rows" :key="r.team.teamId">
+              <td>{{ r.team.teamName }}</td>
               <td>
-                <span v-if="t.managerEmail">{{ t.managerEmail }}</span>
+                <span v-if="r.team.managerEmail">{{ r.team.managerEmail }}</span>
                 <span v-else class="text-medium-emphasis">— (not in the import)</span>
               </td>
               <td>
-                <v-chip :color="stateOf(t).color" variant="tonal" size="small">
-                  {{ stateOf(t).label }}
+                <v-chip :color="r.presentation.color" variant="tonal" size="small">
+                  {{ r.presentation.label }}
                 </v-chip>
               </td>
               <td class="text-right">
                 <v-btn
-                  v-if="provisionState(t) === 'not-provisioned'"
+                  v-if="r.state === 'not-provisioned'"
                   size="small"
                   color="primary"
                   variant="tonal"
-                  @click="openDialog(t)"
+                  @click="openDialog(r.team)"
                 >
                   Provision
                 </v-btn>
