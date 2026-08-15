@@ -40,10 +40,13 @@ export interface MatchRow {
 
 export type MatchFilter = 'all' | 'not-submitted' | 'submitted' | 'past-cutoff'
 
-/** The dashboard's status derivation: submitted stays, everything else is Not
- *  submitted — or Missed cutoff once the team match is past its cutoff. */
+/** The dashboard's status derivation: submitted stays; an invalidated lineup
+ *  reads Not submitted + Needs attention (it exists, it is broken — it is not
+ *  "missing", so it never reads Missed cutoff); anything else is Not submitted,
+ *  or Missed cutoff once the team match is past its cutoff. */
 export function deriveSideStatus(effective: LineupStatus | null, locked: boolean): SideStatus {
   if (effective === 'submitted') return 'submitted'
+  if (effective === 'invalidated') return 'not-submitted'
   return locked ? 'missed-cutoff' : 'not-submitted'
 }
 

@@ -103,6 +103,22 @@ describe('buildMatchRows', () => {
     expect(rows[0].sides[1].needsAttention).toBe(false)
   })
 
+  it('an invalidated lineup past the cutoff is NOT Missed cutoff — it is not missing', () => {
+    const rows = buildMatchRows(
+      args({
+        ties: [tie({ scheduledStart: PAST })],
+        lineups: [
+          lineup('t1', 'Alpha', 'submitted', [['pf']]),
+          lineup('t1', 'Bravo', 'submitted', [['pb']])
+        ],
+        rosterByTeam: new Map([['Alpha', [female('pf')]], ['Bravo', [male('pb')]]])
+      })
+    )
+    expect(rows[0].sides[0].status).toBe('not-submitted')
+    expect(rows[0].sides[0].needsAttention).toBe(true)
+    expect(matchMissesCutoff(rows[0])).toBe(false)
+  })
+
   it('carries the seed-sourced metadata and resolves lineup player names per match', () => {
     const rows = buildMatchRows(
       args({

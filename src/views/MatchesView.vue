@@ -10,9 +10,9 @@ import {
   matchMatchesFilter,
   matchMissesCutoff,
   type MatchFilter,
-  type MatchRow,
-  type MatchSide
+  type MatchRow
 } from '@/domain/matchesDashboard'
+import MatchStatusChips from '@/components/MatchStatusChips.vue'
 
 const tournaments = useTournamentStore()
 const matches = ref<MatchRow[]>([])
@@ -31,31 +31,19 @@ const filtered = computed(() =>
   matches.value.filter((m) => matchMatchesFilter(m, filter.value))
 )
 
-function sideColor(s: MatchSide): string {
-  return s.status === 'submitted' ? 'green' : s.status === 'missed-cutoff' ? 'error' : 'grey'
-}
-
-function sideLabel(s: MatchSide): string {
-  return s.status === 'submitted'
-    ? 'Submitted'
-    : s.status === 'missed-cutoff'
-      ? 'Missed cutoff'
-      : 'Not submitted'
-}
-
 function fmt(iso: string): string {
   return new Date(iso).toLocaleString()
 }
 
-/** group · round metadata, shown where the seed provides it. */
-function groupRound(m: MatchRow): string {
-  return [m.group, m.round].filter((x): x is string => x != null).join(' · ')
+/** group · round metadata parts, shown where the seed provides them. */
+function groupRoundParts(m: MatchRow): string[] {
+  return [m.group, m.round].filter((x): x is string => x != null)
 }
 
 /** The drill-in metadata line: group · round · table · scheduled. */
 function metadata(m: MatchRow): string {
   return [
-    ...[m.group, m.round].filter((x): x is string => x != null),
+    ...groupRoundParts(m),
     ...(m.table != null ? [`Table ${m.table}`] : []),
     fmt(m.scheduledStart)
   ].join(' · ')
@@ -114,19 +102,11 @@ onMounted(load)
                   <v-chip v-if="m.locked" size="small" variant="outlined" class="ml-2">Locked</v-chip>
                 </td>
                 <td>{{ m.table ?? '—' }}</td>
-                <td>{{ groupRound(m) || '—' }}</td>
+                <td>{{ groupRoundParts(m).join(' · ') || '—' }}</td>
                 <td v-for="s in m.sides" :key="s.teamId">
                   <div class="d-flex flex-wrap align-center ga-2">
                     <span>{{ s.teamName }}</span>
-                    <v-chip :color="sideColor(s)" variant="tonal" size="small">
-                      {{ sideLabel(s) }}
-                      <template v-if="s.status === 'missed-cutoff'" #prepend>
-                        <v-icon start icon="mdi-alert"></v-icon>
-                      </template>
-                    </v-chip>
-                    <v-chip v-if="s.needsAttention" color="warning" variant="tonal" size="small">
-                      Needs attention
-                    </v-chip>
+                    <MatchStatusChips :side="s" />
                   </div>
                 </td>
               </tr>
@@ -156,16 +136,8 @@ onMounted(load)
                   <v-card-title class="text-body-1">{{ s.teamName }}</v-card-title>
                 </v-card-item>
                 <v-card-text>
-                  <div class="d-flex flex-wrap align-center ga-2 mb-3">
-                    <v-chip :color="sideColor(s)" variant="tonal" size="small">
-                      {{ sideLabel(s) }}
-                      <template v-if="s.status === 'missed-cutoff'" #prepend>
-                        <v-icon start icon="mdi-alert"></v-icon>
-                      </template>
-                    </v-chip>
-                    <v-chip v-if="s.needsAttention" color="warning" variant="tonal" size="small">
-                      Needs attention
-                    </v-chip>
+                  <div class="mb-3">
+                    <MatchStatusChips :side="s" />
                   </div>
 
                   <div v-if="s.players">
