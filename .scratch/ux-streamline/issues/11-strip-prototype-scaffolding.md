@@ -4,8 +4,12 @@
 
 **Blocked by:** None — can start immediately.
 
-**Status:** ready-for-agent
+**Status:** done (2026-08-15)
 
-- [ ] Dev-only prototype routes and all prototype-only view/component files are deleted; no dead imports remain
-- [ ] `npm run type-check` and `npm run test:run` pass
-- [ ] The tracker docs (map, tickets, spec) are untouched by the removal
+- [x] Dev-only prototype routes and all prototype-only view/component files are deleted; no dead imports remain
+- [x] `npm run type-check` and `npm run test:run` pass
+- [x] The tracker docs (map, tickets, spec) are untouched by the removal
+
+## Evidence
+
+Commit `5aabdd6` — 14 prototype files deleted, dev-only route block removed from the router (1099 deletions, 0 insertions). Grep across `src/`, `e2e/`, config: zero remaining references. Type-check clean; 127/127 unit tests pass. Two-axis review (standards + spec) approved with no violations; its follow-up — a dangling "prototype's renError rule" comment in `src/domain/__tests__/tournamentManage.test.ts` — fixed in `5f3201f` (tests re-run, 127/127). Prototype code remains recoverable from branch history (`4fbab98`..`b0e7175`) as the spec's visual reference.
