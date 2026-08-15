@@ -21,7 +21,7 @@ A team competition within a tournament (e.g. Men's Team). A tournament has sever
 _Avoid_: division, group, class
 
 **Team Match**:
-A team-versus-team fixture within a team event, composed of several matches.
+A team-versus-team fixture within a team event, composed of several matches. Agreed as the on-screen term in both this app and the organizer's tournament-manager (terminology-only cross-app consistency; visual patterns stay per-app).
 _Avoid_: tie, fixture, rubber-set
 
 **Match**:
