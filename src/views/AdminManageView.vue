@@ -28,10 +28,10 @@ const saving = ref(false)
 const editError = computed(() =>
   active.value ? renameError(editName.value, otherNames(active.value)) : 'Name is required'
 )
-const editUnchangedNow = computed(() =>
+const editIsNoop = computed(() =>
   active.value ? editUnchanged(active.value, { name: editName.value, startDate: editDate.value }) : true
 )
-const canSave = computed(() => !editError.value && !editUnchangedNow.value)
+const canSave = computed(() => !editError.value && !editIsNoop.value)
 
 function openEdit(): void {
   const t = active.value

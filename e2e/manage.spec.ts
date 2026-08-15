@@ -107,8 +107,10 @@ test.describe.serial('manage & delete tournaments (#15)', () => {
     // Scoped to the dialog: the page behind it also has a "Delete tournament" button.
     await page.getByRole('dialog').getByRole('button', { name: 'Delete tournament' }).click()
 
-    // Delete confirmed; the active tournament fell back to another one.
-    await expect(page.getByText(/deleted/i)).toBeVisible()
+    // Delete confirmed; the active tournament fell back to another one (Default
+    // is the store's first-by-name fallback) — the app bar names it.
+    await expect(page.getByText('Tournament settings · Default')).toBeVisible()
+    await expect(page.getByText(`Tournament settings · ${RENAMED}`)).toHaveCount(0)
 
     // The manager can no longer sign in — the edge function removed the account.
     const after = await request.post(`${supabaseUrl}/auth/v1/token?grant_type=password`, {
