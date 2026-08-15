@@ -1,21 +1,24 @@
 <script setup lang="ts">
+// Tournament settings (spec §7 / ticket #15): managing the SELECTED tournament
+// — rename, start-date edit, delete. The selector in the app bar owns
+// switching; this page deliberately shows no tournament list (the rejected
+// design). The start date keys the format freeze (ticket 16) and the selector's
+// Active & upcoming grouping, so saving reloads the store and both follow.
 import { computed, ref } from 'vue'
+import { useRouter } from 'vue-router'
 import { supabase } from '@/lib/supabase'
-import { useTournamentStore, type Tournament } from '@/stores/tournament'
-import { renameError } from '@/domain/tournamentManage'
-
-// Ticket #15: the Administrator manages tournaments — rename (uniqueness-checked),
-// set/edit start date, and delete (cascade + manager-account cleanup). Delete is
-// the one operation the browser client can't do alone (removing auth accounts
-// needs the service role), so it goes through the delete-tournament edge function.
+import { useTournamentStore } from '@/stores/tournament'
+import { deleteReady, editUnchanged, renameError } from '@/domain/tournamentManage'
 
 const tournaments = useTournamentStore()
+const router = useRouter()
+const active = computed(() => tournaments.active)
 
 type Result = { ok: boolean; message: string }
 const result = ref<Result | null>(null)
 
-// --- rename / start-date edit ---
-const editTarget = ref<Tournament | null>(null)
+// --- rename / start-date edit (target: the selected tournament) ---
+const editing = ref(false)
 const editName = ref('')
 const editDate = ref('') // yyyy-mm-dd, or '' for "no start date"
 const saving = ref(false)
@@ -23,28 +26,28 @@ const saving = ref(false)
 // Names of every OTHER tournament — passed to renameError so keeping the current
 // name is always valid, but a case-folded clash with a sibling is blocked.
 const editError = computed(() =>
-  editTarget.value ? renameError(editName.value, otherNames(editTarget.value)) : 'Name is required'
+  active.value ? renameError(editName.value, otherNames(active.value)) : 'Name is required'
 )
-const editUnchanged = computed(() => {
-  if (!editTarget.value) return true
-  const sameName = editName.value.trim() === editTarget.value.name
-  const currentDate = editTarget.value.startDate ?? ''
-  return sameName && editDate.value === currentDate
-})
+const editUnchangedNow = computed(() =>
+  active.value ? editUnchanged(active.value, { name: editName.value, startDate: editDate.value }) : true
+)
+const canSave = computed(() => !editError.value && !editUnchangedNow.value)
 
-function openEdit(t: Tournament): void {
-  editTarget.value = t
+function openEdit(): void {
+  const t = active.value
+  if (!t) return
   editName.value = t.name
   editDate.value = t.startDate ?? ''
+  editing.value = true
 }
 
-function otherNames(t: Tournament): string[] {
+function otherNames(t: { id: string }): string[] {
   return tournaments.tournaments.filter((x) => x.id !== t.id).map((x) => x.name)
 }
 
 async function saveEdit(): Promise<void> {
-  const t = editTarget.value
-  if (!t || editError.value || editUnchanged.value) return
+  const t = active.value
+  if (!t || !canSave.value) return
   saving.value = true
   try {
     const { error } = await supabase
@@ -55,8 +58,10 @@ async function saveEdit(): Promise<void> {
       result.value = { ok: false, message: error.message }
       return
     }
+    // Reload so the selector's grouping, the shell's freeze anchor, and the
+    // app-bar name all pick up the change.
     await tournaments.load()
-    editTarget.value = null
+    editing.value = false
     result.value = { ok: true, message: `Tournament “${editName.value.trim()}” updated.` }
   } catch (e) {
     result.value = { ok: false, message: (e as Error).message }
@@ -66,20 +71,25 @@ async function saveEdit(): Promise<void> {
 }
 
 // --- delete (double-confirm) ---
-const delTarget = ref<Tournament | null>(null)
+const deleting = ref(false)
+// Snapshot of the tournament the dialog was opened for — the dialog must confirm
+// and delete the SAME tournament even if the selector switches mid-dialog.
+const delTarget = ref<{ id: string; name: string } | null>(null)
 const delCheckbox = ref(false)
 const delText = ref('')
-// Manager-account count for the targeted tournament (fetched when the dialog
+// Manager-account count for the selected tournament (fetched when the dialog
 // opens), so the consequence list can name a concrete number being cleared.
 const delManagerCount = ref<number | null>(null)
 const delBusy = ref(false)
 
-const delCanDelete = computed(
-  () => !!delTarget.value && delCheckbox.value && delText.value === delTarget.value.name
+const delCanDelete = computed(() =>
+  !!delTarget.value && deleteReady(delText.value, delCheckbox.value, delTarget.value.name)
 )
 
-async function openDelete(t: Tournament): Promise<void> {
-  delTarget.value = t
+async function openDelete(): Promise<void> {
+  const t = active.value
+  if (!t) return
+  delTarget.value = { id: t.id, name: t.name }
   delCheckbox.value = false
   delText.value = ''
   // null = not loaded yet (or the count failed): the dialog then omits the
@@ -136,7 +146,14 @@ async function confirmDelete(): Promise<void> {
     // Reload re-resolves the active tournament: keep it if still present, else
     // fall back to another, or to the empty state when none remain.
     await tournaments.load()
+    deleting.value = false
     delTarget.value = null
+    if (!tournaments.tournaments.length) {
+      // Setup-aware landing rules: with nothing left to manage, the empty
+      // state owns the screen (and the import CTA).
+      await router.push({ name: 'setup' })
+      return
+    }
     const cleared = data?.removedAccounts ?? 0
     result.value = {
       ok: true,
@@ -174,48 +191,37 @@ function fmtDate(d: string | null): string {
       {{ result.message }}
     </v-alert>
 
-    <v-card elevation="2" rounded="lg" class="mt-4">
+    <v-card v-if="active" elevation="2" rounded="lg" class="mt-4">
       <v-card-item>
-        <v-card-title>Tournaments</v-card-title>
-        <v-card-subtitle>
-          Rename a tournament (names must be unique), set its start date, or delete one entirely.
-        </v-card-subtitle>
+        <v-card-title>{{ active.name }}</v-card-title>
+        <v-card-subtitle>Start date: {{ fmtDate(active.startDate) }}</v-card-subtitle>
       </v-card-item>
       <v-divider />
-      <v-list v-if="tournaments.tournaments.length" lines="two">
-        <v-list-item v-for="t in tournaments.tournaments" :key="t.id">
-          <template #prepend><v-icon>mdi-trophy</v-icon></template>
-          <v-list-item-title>{{ t.name }}</v-list-item-title>
-          <v-list-item-subtitle>Start date: {{ fmtDate(t.startDate) }}</v-list-item-subtitle>
-          <template #append>
-            <v-btn
-              icon="mdi-pencil"
-              variant="text"
-              size="small"
-              :aria-label="`Edit ${t.name}`"
-              title="Edit name / start date"
-              @click="openEdit(t)"
-            />
-            <v-btn
-              icon="mdi-delete"
-              variant="text"
-              size="small"
-              color="error"
-              :aria-label="`Delete ${t.name}`"
-              title="Delete tournament"
-              @click="openDelete(t)"
-            />
-          </template>
-        </v-list-item>
-      </v-list>
-      <v-card-text v-else class="text-center text-medium-emphasis pa-8">
-        No tournaments yet —
+      <v-card-text>
+        <p class="text-body-2 text-medium-emphasis mb-4">
+          Rename this tournament, edit its start date, or delete it. To work on a different
+          tournament, switch it from the selector in the top right.
+        </p>
+        <div class="d-flex flex-wrap ga-2">
+          <v-btn color="primary" variant="tonal" prepend-icon="mdi-pencil" @click="openEdit">
+            Edit name / start date
+          </v-btn>
+          <v-btn color="error" variant="tonal" prepend-icon="mdi-delete" @click="openDelete">
+            Delete tournament
+          </v-btn>
+        </div>
+      </v-card-text>
+    </v-card>
+
+    <v-card v-else elevation="2" rounded="lg" class="mt-4">
+      <v-card-text class="text-center text-medium-emphasis pa-8">
+        No tournament selected —
         <v-btn variant="text" color="primary" to="/setup">import one to get started</v-btn>.
       </v-card-text>
     </v-card>
 
     <!-- Edit (rename + start date) dialog -->
-    <v-dialog :model-value="!!editTarget" @update:model-value="editTarget = null" max-width="480">
+    <v-dialog :model-value="editing" @update:model-value="editing = false" max-width="480">
       <v-card rounded="lg">
         <v-card-item><v-card-title>Edit tournament</v-card-title></v-card-item>
         <v-card-text>
@@ -231,19 +237,14 @@ function fmtDate(d: string | null): string {
             label="Start date"
             type="date"
             clearable
-            hint="Anchors 'as of tournament start' age rules. Optional."
+            hint="Keys the format freeze once the tournament starts, the Active & upcoming grouping, and 'as of tournament start' age rules. Optional."
             persistent-hint
           />
         </v-card-text>
         <v-card-actions>
           <v-spacer />
-          <v-btn variant="text" @click="editTarget = null">Cancel</v-btn>
-          <v-btn
-            color="primary"
-            :loading="saving"
-            :disabled="!!editError || editUnchanged"
-            @click="saveEdit"
-          >
+          <v-btn variant="text" @click="editing = false">Cancel</v-btn>
+          <v-btn color="primary" :loading="saving" :disabled="!canSave" @click="saveEdit">
             Save
           </v-btn>
         </v-card-actions>
@@ -251,7 +252,7 @@ function fmtDate(d: string | null): string {
     </v-dialog>
 
     <!-- Delete dialog: consequences + double-confirm -->
-    <v-dialog :model-value="!!delTarget" @update:model-value="delTarget = null" max-width="520" persistent>
+    <v-dialog :model-value="deleting" @update:model-value="deleting = false" max-width="520" persistent>
       <v-card rounded="lg">
         <v-card-item>
           <v-card-title class="text-error">
@@ -296,7 +297,7 @@ function fmtDate(d: string | null): string {
         </v-card-text>
         <v-card-actions>
           <v-spacer />
-          <v-btn variant="text" @click="delTarget = null">Cancel</v-btn>
+          <v-btn variant="text" @click="deleting = false">Cancel</v-btn>
           <v-btn color="error" :loading="delBusy" :disabled="!delCanDelete" @click="confirmDelete">
             Delete tournament
           </v-btn>

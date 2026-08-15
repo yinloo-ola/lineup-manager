@@ -1,7 +1,7 @@
-// Ticket #15: pure helpers for the Manage-tournaments surface (rename / start
-// date / delete). The one non-trivial rule is rename validation — the delete
-// double-confirm is a literal name match and the start date is a plain string
-// bind, both handled inline in the view.
+// Ticket #15: pure helpers for the Tournament settings surface (rename / start
+// date / delete of the SELECTED tournament). The non-trivial rule is rename
+// validation; the edit-save and delete dialog gates live here too so their
+// state transitions are unit-tested.
 
 /**
  * Case-folded tournament-name clash check. The DB enforces a case-sensitive
@@ -30,4 +30,30 @@ export function renameError(desiredName: string, otherNames: string[]): string |
     return 'A tournament with that name already exists'
   }
   return null
+}
+
+/** A tournament as the settings page sees it: '' in `next.startDate` means "no start date". */
+export interface TournamentEdit {
+  name: string
+  startDate: string
+}
+
+/**
+ * True when a proposed edit changes nothing (name compared trimmed, empty date
+ * meaning "no start date"). The Save action stays disabled while true.
+ */
+export function editUnchanged(
+  current: { name: string; startDate: string | null },
+  next: TournamentEdit
+): boolean {
+  return next.name.trim() === current.name && next.startDate === (current.startDate ?? '')
+}
+
+/**
+ * The delete double-confirm gate: the acknowledgement checkbox is ticked AND
+ * the typed confirmation is a literal (case-sensitive) match of the
+ * tournament's name. Pure.
+ */
+export function deleteReady(typedName: string, acknowledged: boolean, tournamentName: string): boolean {
+  return acknowledged && typedName === tournamentName
 }
