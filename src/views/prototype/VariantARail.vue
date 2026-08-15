@@ -1,6 +1,7 @@
 <script setup lang="ts">
-// PROTOTYPE — Variant A: persistent left rail, grouped by tournament phase.
-// Throwaway (wayfinder ticket 06). Do not commit.
+// PROTOTYPE — Variant A, final shape per user verdict: flat rail, no
+// collapsing — Matches primary, the three setup sections directly reachable
+// but visually subordinate. Throwaway (wayfinder ticket 06). Do not commit.
 import { computed } from 'vue'
 import MockContent from './MockContent.vue'
 import TournamentSelectStub from './TournamentSelectStub.vue'
@@ -14,9 +15,8 @@ const setupItems: { section: Section; title: string; icon: string }[] = [
 
 const title = computed(() => {
   if (phase.value === 'none') return 'Getting started'
-  const s = activeSection.value
-  if (s === 'oversight') return 'Oversight'
-  return setupItems.find((i) => i.section === s)?.title ?? ''
+  if (activeSection.value === 'oversight') return 'Matches'
+  return setupItems.find((i) => i.section === activeSection.value)?.title ?? ''
 })
 </script>
 
@@ -27,10 +27,10 @@ const title = computed(() => {
       <template v-if="phase !== 'none'">
         <div class="px-4 pt-2 text-overline text-medium-emphasis">Tournament</div>
         <v-list-item
-          active
+          :active="activeSection === 'oversight'"
           :active-color="activeSection === 'oversight' ? 'primary' : undefined"
-          prepend-icon="mdi-clipboard-list-outline"
-          title="Oversight"
+          prepend-icon="mdi-table-tennis"
+          title="Matches"
           @click="activeSection = 'oversight'"
         />
         <v-divider class="my-2" />
@@ -41,16 +41,18 @@ const title = computed(() => {
         :key="i.section"
         :active="activeSection === i.section"
         :prepend-icon="i.icon"
-        :title="i.title"
         :append-icon="i.section === 'formats' && phase === 'started' ? 'mdi-lock-outline' : undefined"
+        class="text-medium-emphasis"
         @click="activeSection = i.section"
-      />
+      >
+        <v-list-item-title class="text-body-2">{{ i.title }}</v-list-item-title>
+      </v-list-item>
     </v-navigation-drawer>
 
     <v-app-bar flat color="surface" elevation="1">
       <v-app-bar-title>
         {{ title }}
-        <span v-if="activeTournament" class="text-medium-emphasis text-body-2">
+        <span v-if="activeTournament && phase !== 'none'" class="text-medium-emphasis text-body-2">
           · {{ activeTournament }}
         </span>
       </v-app-bar-title>

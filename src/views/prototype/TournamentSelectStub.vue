@@ -1,11 +1,13 @@
 <script setup lang="ts">
-// PROTOTYPE — shared leaf stub: the tournament selector with a trailing
-// "Import seed…" create entry that opens a dialog. Throwaway (ticket 06).
-import { ref, watch } from 'vue'
-import { activeTournament } from './mock'
+// PROTOTYPE — shared leaf stub: a searchable tournament selector with grouped
+// Active & upcoming / Past sections and a trailing "Import tournament…"
+// create entry that opens a dialog. Throwaway (ticket 06).
+import { computed, ref, watch } from 'vue'
+import { activeTournament, tournaments } from './mock'
 
 const model = ref<string | null>(null)
 const dialog = ref(false)
+const search = ref('')
 watch(
   activeTournament,
   (t) => {
@@ -21,43 +23,75 @@ function onChange(v: unknown): void {
     dialog.value = true
     model.value = activeTournament.value
   }
+  search.value = ''
 }
+
+// Grouped, newest-first, filtered by the search box. Headers drop out when
+// their group is empty; the create entry always stays visible.
+const items = computed(() => {
+  const q = search.value.trim().toLowerCase()
+  const matches = (t: (typeof tournaments)[number]) =>
+    !q || t.name.toLowerCase().includes(q) || t.starts.includes(q)
+  const live = tournaments.filter((t) => t.status !== 'past' && matches(t))
+  const past = tournaments.filter((t) => t.status === 'past' && matches(t))
+  const out: Array<Record<string, unknown>> = []
+  if (live.length) {
+    out.push({ header: 'Active & upcoming' })
+    out.push(
+      ...live.map((t) => ({
+        title: t.name,
+        value: t.name,
+        props: { subtitle: t.starts }
+      }))
+    )
+  }
+  if (past.length) {
+    out.push({ header: 'Past' })
+    out.push(
+      ...past.map((t) => ({
+        title: t.name,
+        value: t.name,
+        props: { subtitle: t.starts }
+      }))
+    )
+  }
+  out.push({
+    title: 'Import tournament…',
+    value: '__import__',
+    props: { prependIcon: 'mdi-database-import', baseColor: 'primary' }
+  })
+  return out
+})
 </script>
 
 <template>
   <div>
-    <v-select
-      :model-value="model"
-      :items="[
-        'Spring League 2026',
-        'Autumn Open 2026',
-        {
-          title: 'Import seed…',
-          value: '__import__',
-          props: { prependIcon: 'mdi-database-import', baseColor: 'primary' }
-        }
-      ]"
+    <v-autocomplete
+      v-model="model"
+      v-model:search="search"
+      :items="items"
       label="Tournament"
       density="compact"
       hide-details
       variant="outlined"
-      style="max-width: 240px"
+      :menu-props="{ maxHeight: 320 }"
+      style="max-width: 280px"
       @update:model-value="onChange"
     />
 
     <v-dialog v-model="dialog" max-width="480">
       <v-card>
         <v-card-item>
-          <v-card-title>Import seed — create a tournament</v-card-title>
+          <v-card-title>Import tournament</v-card-title>
         </v-card-item>
         <v-card-text>
-          Upload the organizer's seed JSON. This is the create action: each import creates one more
-          tournament — with its team events, teams, players, team matches, and each team's manager
-          email.
-          <v-file-input label="Seed file" density="compact" prepend-icon="" class="mt-3" />
+          Upload the tournament JSON exported from the organizer tool. This is the create action:
+          each import creates one more tournament — with its team events, teams, players, team
+          matches, and each team's manager email.
+          <v-file-input label="Tournament file" density="compact" prepend-icon="" class="mt-3" />
           <p class="text-caption text-medium-emphasis mt-2">
             After import: author the team match formats, then provision the manager accounts —
-            emails pre-filled from the seed.
+            emails pre-filled from the import.
           </p>
         </v-card-text>
         <v-card-actions>

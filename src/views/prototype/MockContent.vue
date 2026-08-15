@@ -13,9 +13,9 @@ defineProps<{ section: string }>()
         <v-icon icon="mdi-trophy-outline" size="48" class="mb-2" />
         <div class="text-h6">No tournament yet</div>
         <p class="text-body-2 text-medium-emphasis mb-4">
-          Import a seed to create your first tournament, its team events, teams, and team matches.
+          Import a tournament to create your first one — its team events, teams, and team matches.
         </p>
-        <v-btn color="primary" prepend-icon="mdi-database-import">Import seed</v-btn>
+        <v-btn color="primary" prepend-icon="mdi-database-import">Import tournament</v-btn>
       </v-card>
     </template>
 
@@ -96,11 +96,11 @@ defineProps<{ section: string }>()
 
       <v-card v-else elevation="1" rounded="lg" class="pa-4" data-section="provision">
         <div class="text-h6 mb-2">Provision managers</div>
-        <p class="text-caption text-medium-emphasis mb-2">Emails pre-filled from the seed — one per team.</p>
+        <p class="text-caption text-medium-emphasis mb-2">Emails pre-filled from the import — one per team.</p>
         <v-list lines="two" density="compact">
-          <v-list-item title="Team Alpha" subtitle="alpha.manager@example.com (from seed) · active" />
-          <v-list-item title="Team Bravo" subtitle="bravo.manager@example.com (from seed) · must change password" />
-          <v-list-item title="Team Charlie" subtitle="charlie.manager@example.com (from seed) · not provisioned yet" />
+          <v-list-item title="Team Alpha" subtitle="alpha.manager@example.com (from import) · active" />
+          <v-list-item title="Team Bravo" subtitle="bravo.manager@example.com (from import) · must change password" />
+          <v-list-item title="Team Charlie" subtitle="charlie.manager@example.com (from import) · not provisioned yet" />
         </v-list>
         <v-btn color="primary" variant="tonal" size="small" class="mt-2" prepend-icon="mdi-account-plus">
           Provision selected

@@ -1,38 +1,24 @@
 <script setup lang="ts">
-// PROTOTYPE — Variant C: two phase modes (Setup | Oversight); setup is a task
-// launcher, not a persistent nav. Throwaway (wayfinder ticket 06). Do not commit.
-import { computed, ref, watch } from 'vue'
+// PROTOTYPE — Variant C, reshaped per user verdict: left nav with Matches as
+// the primary area and Setup demoted below it; setup's three sections are
+// inner tabs. Throwaway (wayfinder ticket 06). Do not commit.
+import { ref, watch } from 'vue'
 import MockContent from './MockContent.vue'
 import TournamentSelectStub from './TournamentSelectStub.vue'
 import { activeTournament, phase } from './mock'
 
-type Mode = 'setup' | 'oversight'
-const mode = ref<Mode>(phase.value === 'none' ? 'setup' : 'oversight')
+type Mode = 'matches' | 'setup'
+const mode = ref<Mode>(phase.value === 'none' ? 'setup' : 'matches')
 watch(phase, (p) => {
-  mode.value = p === 'none' ? 'setup' : 'oversight'
+  mode.value = p === 'none' ? 'setup' : 'matches'
 })
 
-const setupSection = ref<string>('tournaments')
-const setupTasks = computed(() => [
-  {
-    key: 'tournaments',
-    title: 'Tournament settings',
-    icon: 'mdi-tune-variant',
-    note: 'Rename, start date, delete — for the selected tournament'
-  },
-  {
-    key: 'formats',
-    title: 'Team match formats',
-    icon: 'mdi-format-list-bulleted',
-    note: phase.value === 'started' ? 'Frozen — tournament started' : '2 of 2 authored'
-  },
-  {
-    key: 'provision',
-    title: 'Provision managers',
-    icon: 'mdi-account-plus',
-    note: '2 managers provisioned'
-  }
-])
+const setupTab = ref<string>('tournaments')
+const setupTabs = [
+  { key: 'tournaments', title: 'Tournament settings' },
+  { key: 'formats', title: 'Team match formats' },
+  { key: 'provision', title: 'Provision managers' }
+]
 </script>
 
 <template>
@@ -51,39 +37,48 @@ const setupTasks = computed(() => [
       </template>
     </v-app-bar>
 
+    <!-- Left nav: Matches is the primary area; Setup is deliberately subordinate. -->
+    <v-navigation-drawer permanent width="200" :border="0" color="surface">
+      <v-list density="compact" nav>
+        <v-list-item
+          :active="mode === 'matches'"
+          active-class="border-s-primary"
+          prepend-icon="mdi-table-tennis"
+          title="Matches"
+          :disabled="phase === 'none'"
+          @click="mode = 'matches'"
+        />
+        <v-divider class="my-2" />
+        <v-list-item
+          :active="mode === 'setup'"
+          prepend-icon="mdi-cog-outline"
+          class="text-medium-emphasis"
+          @click="mode = 'setup'"
+        >
+          <v-list-item-title class="text-body-2">Setup</v-list-item-title>
+        </v-list-item>
+      </v-list>
+    </v-navigation-drawer>
+
     <v-main>
       <v-container>
-        <v-btn-toggle v-model="mode" mandatory color="primary" density="comfortable" class="mb-4">
-          <v-btn value="setup" :disabled="phase === 'none' ? false : false">Setup</v-btn>
-          <v-btn value="oversight" :disabled="phase === 'none'">Oversight</v-btn>
-        </v-btn-toggle>
+        <!-- Matches: the dashboard is the screen. -->
+        <MockContent v-if="mode === 'matches'" section="oversight" />
 
-        <!-- Setup mode: a launcher of tasks, status marked per task. -->
-        <template v-if="mode === 'setup'">
-          <v-row>
-            <v-col v-for="t in setupTasks" :key="t.key" cols="12" sm="6" md="3">
-              <v-card
-                elevation="1"
-                rounded="lg"
-                class="fill-height"
-                :class="{ 'border-primary': setupSection === t.key }"
-                @click="setupSection = t.key"
-              >
-                <v-card-item>
-                  <template #prepend><v-icon :icon="t.icon" /></template>
-                  <v-card-title class="text-body-1">{{ t.title }}</v-card-title>
-                  <v-card-subtitle class="text-caption">{{ t.note }}</v-card-subtitle>
-                </v-card-item>
-              </v-card>
-            </v-col>
-          </v-row>
-          <div class="mt-4">
-            <MockContent :section="phase === 'none' ? 'none' : setupSection" />
-          </div>
+        <!-- Setup: the three setup sections as inner tabs. -->
+        <template v-else>
+          <v-tabs v-model="setupTab" density="comfortable" color="primary" class="mb-4">
+            <v-tab
+              v-for="t in setupTabs"
+              :key="t.key"
+              :value="t.key"
+              :disabled="phase === 'none' && t.key !== 'tournaments'"
+            >
+              {{ t.title }}
+            </v-tab>
+          </v-tabs>
+          <MockContent :section="phase === 'none' ? 'none' : setupTab" />
         </template>
-
-        <!-- Oversight mode: the dashboard is the screen. -->
-        <MockContent v-else section="oversight" />
       </v-container>
     </v-main>
   </v-layout>

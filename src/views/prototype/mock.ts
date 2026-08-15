@@ -8,9 +8,27 @@ export type Section = 'oversight' | 'tournaments' | 'formats' | 'provision'
 export const phase = ref<MockPhase>('before')
 export const activeSection = ref<Section>('oversight')
 
-export const tournaments = ['Spring League 2026', 'Autumn Open 2026']
+export interface MockTournament {
+  name: string
+  starts: string
+  status: 'active' | 'upcoming' | 'past'
+}
+
+// Deliberately long — the selector must survive a growing archive of past
+// tournaments (lineups stay viewable, so the list never shrinks).
+export const tournaments: MockTournament[] = [
+  { name: 'Spring League 2026', starts: '2026-08-14', status: 'active' },
+  { name: 'Autumn Open 2026', starts: '2026-10-03', status: 'upcoming' },
+  { name: 'Winter Cup 2026', starts: '2026-01-18', status: 'past' },
+  { name: 'Autumn Open 2025', starts: '2025-10-05', status: 'past' },
+  { name: 'Spring League 2025', starts: '2025-08-16', status: 'past' },
+  { name: 'Winter Cup 2025', starts: '2025-01-19', status: 'past' },
+  { name: 'Autumn Open 2024', starts: '2024-10-06', status: 'past' },
+  { name: 'Spring League 2024', starts: '2024-08-17', status: 'past' },
+  { name: 'Winter Cup 2024', starts: '2024-01-21', status: 'past' }
+]
 export const activeTournament = computed(() =>
-  phase.value === 'none' ? null : tournaments[0]
+  phase.value === 'none' ? null : tournaments[0].name
 )
 
 // Landing is setup-aware (walkthrough decision): oversight when a tournament
