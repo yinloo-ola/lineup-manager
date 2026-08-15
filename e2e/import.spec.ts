@@ -53,7 +53,8 @@ function seedJson(tournamentName: string): string {
 
 test.describe('tournament import (selector dialog) → new tournament', () => {
   test('creates a new tournament, selects it, and its teams show in a scoped view', async ({
-    page
+    page,
+    request
   }) => {
     // Unique name per run so the happy path never clashes with a prior run.
     const name = `E2E Import ${Date.now()}`
@@ -64,14 +65,44 @@ test.describe('tournament import (selector dialog) → new tournament', () => {
     await page.getByRole('button', { name: /parse & import/i }).click()
     await expect(page.getByText(/created —/)).toBeVisible()
 
-    // The new tournament is auto-selected; its imported teams appear under provisioning.
+    // The new tournament is auto-selected; its imported teams appear under
+    // provisioning, each with its seeded manager email, not provisioned yet.
     await page.goto('/provision')
     // The selector reflects the freshly created + selected tournament.
     await expect(page.getByText(name)).toBeVisible()
-    // Open the Team dropdown (Vuetify's v-field__input intercepts label clicks).
-    await page.locator('.v-field').filter({ hasText: 'Team' }).click()
-    await expect(page.getByRole('option', { name: 'Importers' })).toBeVisible()
-    await expect(page.getByRole('option', { name: 'Rivals' })).toBeVisible()
+    await expect(page.getByText('Importers')).toBeVisible()
+    await expect(page.getByText('Rivals')).toBeVisible()
+    await expect(page.getByText('importers@example.test')).toBeVisible()
+    await expect(page.getByText('rivals@example.test')).toBeVisible()
+    await expect(page.getByText('0 of 2 team(s) provisioned.')).toBeVisible()
+
+    // Provision one manager through the dialog — correcting the seeded email
+    // to a unique address while at it (a repeated run's createUser would
+    // otherwise collide with the same address). Ticket #17.
+    await page.getByRole('button', { name: 'Provision', exact: true }).first().click()
+    const unique = `importer-${Date.now()}@example.test`
+    await page.getByLabel('Manager email').fill(unique)
+    await page.getByLabel('Initial password').fill('importer-pw-123')
+    await page.getByRole('dialog').getByRole('button', { name: 'Provision' }).click()
+    await expect(page.getByText(/Team Manager created for Importers/)).toBeVisible()
+    await expect(page.getByText('1 of 2 team(s) provisioned.')).toBeVisible()
+
+    // Cleanup: this tournament now owns a real auth account, so it goes through
+    // the delete-tournament edge function (which clears manager accounts) —
+    // repeated runs don't accumulate garbage.
+    const admin = await apiToken(request, TEST_ADMIN_EMAIL, TEST_ADMIN_PASSWORD)
+    const tourRes = await request.get(
+      `${supabaseUrl}/rest/v1/tournaments?name=eq.${encodeURIComponent(name)}&select=id`,
+      { headers: authHeaders(admin) }
+    )
+    const [mine] = (await tourRes.json()) as { id: string }[]
+    if (mine) {
+      const del = await request.post(`${supabaseUrl}/functions/v1/delete-tournament`, {
+        headers: authHeaders(admin),
+        data: { tournamentId: mine.id }
+      })
+      expect(del.ok()).toBeTruthy()
+    }
   })
 
   test('a clashing name blocks import and offers a rename that completes it', async ({

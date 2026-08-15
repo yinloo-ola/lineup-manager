@@ -124,6 +124,11 @@ export function parseSeed(input: unknown): SeedFile {
 /** A team's manager email must look like one and belong to exactly one team. */
 const EMAIL_SHAPE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
+/** Shared email-shape check (the seed parser and the provisioning page agree). */
+export function isEmailShape(email: string): boolean {
+  return EMAIL_SHAPE.test(email)
+}
+
 function assertUniqueManagerEmails(teams: SeedTeam[]): void {
   const byEmail = new Map<string, SeedTeam>()
   for (const t of teams) {
