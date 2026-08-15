@@ -22,10 +22,11 @@ A decision-complete UX spec for the **administrator console**: every open experi
 - [Settle the user-facing status vocabulary](issues/05-user-facing-status-vocabulary.md) — binary Submitted/Not submitted outside the builder, rare Needs-attention marker, Locked chip stays, "completed" reserved for a future results feature; formats freeze at tournament start with guarded (impact-preview + confirm) pre-start edits. Glossary updated in `CONTEXT.md`.
 - [Prototype the admin shell and phase-based navigation](issues/06-admin-shell-navigation-prototype.md) — the shell is variant A: flat left rail, **Matches** primary, the three setup sections (Tournament settings / Team match formats / Provision managers) directly in the rail but visually subordinate, no collapsing; setup-aware landing; searchable tournament selector owning switching **and** creation ("Import tournament…" — never "Import seed" on screen), defaulting to Active & upcoming with past tournaments surfaced only by search; format freeze shown as a rail lock icon.
 - [Prototype the oversight dashboard and grouped lineups view](issues/07-oversight-dashboard-prototype.md) — the Matches dashboard is a dense fixture table: one row per team match (scheduled → table sort), status chips inline, calm Locked chip for cutoff-passed matches, and the urgent **Missed cutoff** state (missing past cutoff) tinted red; filters All / Not submitted / Submitted / Past cutoff; drill-in dialog with both lineups and Edit/Fill-on-behalf (`?team=`); chasing stays visibility-only. Glossary gained Missed cutoff.
+- [Specify the seed contract with the organizer tool](issues/08-seed-contract-with-organizer-tool.md) — seed v1 adds `seedVersion: 1` (required), `startDate` (optional; auto-filled at import from earliest `scheduledStart`, editable in Tournament settings), `teams[].managerEmail` (required, unique, parse-enforced — organizer must add email capture), and optional `ties[].group`/`ties[].round` labels. Consumer-owned contract: `docs/seed-contract.md` + JSON Schema here, producer repo links to it.
 
 ## Not yet specified
 
-- Cross-app consistency — whether the console's patterns must stay consistent with the separate `tournament-manager` repo. Hangs on the remaining view decisions (the dashboard) and the seed contract.
+_(empty — the last fog patch, cross-app consistency, graduated into [Must the console's patterns stay consistent with tournament-manager?](issues/09-cross-app-consistency-with-organizer.md))_
 
 ## Out of scope
 
