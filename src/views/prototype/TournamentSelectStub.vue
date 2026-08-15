@@ -26,15 +26,16 @@ function onChange(v: unknown): void {
   search.value = ''
 }
 
-// Grouped, newest-first, filtered by the search box. Headers drop out when
-// their group is empty; the create entry always stays visible.
+// Active & upcoming always shown; past tournaments only surface when
+// searching (the archive stays out of the default menu). The create entry
+// always stays visible. Built-in filtering is disabled — this computed is
+// the single filter.
 const items = computed(() => {
   const q = search.value.trim().toLowerCase()
   const matches = (t: (typeof tournaments)[number]) =>
     !q || t.name.toLowerCase().includes(q) || t.starts.includes(q)
-  const live = tournaments.filter((t) => t.status !== 'past' && matches(t))
-  const past = tournaments.filter((t) => t.status === 'past' && matches(t))
   const out: Array<Record<string, unknown>> = []
+  const live = tournaments.filter((t) => t.status !== 'past' && matches(t))
   if (live.length) {
     out.push({ header: 'Active & upcoming' })
     out.push(
@@ -45,15 +46,23 @@ const items = computed(() => {
       }))
     )
   }
-  if (past.length) {
-    out.push({ header: 'Past' })
-    out.push(
-      ...past.map((t) => ({
-        title: t.name,
-        value: t.name,
-        props: { subtitle: t.starts }
-      }))
-    )
+  if (q) {
+    const past = tournaments.filter((t) => t.status === 'past' && matches(t))
+    if (past.length) {
+      out.push({ header: 'Past' })
+      out.push(
+        ...past.map((t) => ({
+          title: t.name,
+          value: t.name,
+          props: { subtitle: t.starts }
+        }))
+      )
+    }
+  } else {
+    out.push({
+      title: 'Type to search past tournaments',
+      props: { disabled: true, prependIcon: 'mdi-magnify' }
+    })
   }
   out.push({
     title: 'Import tournament…',
@@ -70,6 +79,7 @@ const items = computed(() => {
       v-model="model"
       v-model:search="search"
       :items="items"
+      :filter="() => true"
       label="Tournament"
       density="compact"
       hide-details
