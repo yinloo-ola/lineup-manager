@@ -14,6 +14,7 @@ export interface AdminLineupInput {
   teamId: string
   status: LineupStatus
   playerIds: (string[] | null)[]
+  submittedAt?: string | null
   updatedAt: string
   updatedBy: string | null
 }
@@ -22,6 +23,9 @@ export interface AdminTieInput {
   tieId: string
   categoryId: string
   scheduledStart: string
+  table?: string
+  group?: string
+  round?: string
   teamIds: [string, string]
 }
 

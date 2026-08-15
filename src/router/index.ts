@@ -23,7 +23,7 @@ const router = createRouter({
         {
           path: 'matches',
           name: 'matches',
-          component: () => import('@/views/AdminLineupsView.vue'),
+          component: () => import('@/views/MatchesView.vue'),
           meta: { title: 'Matches' },
           alias: '/admin/lineups'
         },

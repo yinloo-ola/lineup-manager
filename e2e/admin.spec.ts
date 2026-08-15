@@ -25,10 +25,11 @@ test.describe('administrator dashboard + overwrite', () => {
     await expect(page).toHaveURL(/\/matches$/)
     await expect(page.getByText('Matches').first()).toBeVisible()
 
-    // The oversight table lists lineups (the pre-created Alpha lineup guarantees a row).
+    // The fixture table lists one row per team match (the pre-created Alpha
+    // lineup guarantees a Submitted chip in Alpha's row).
     await page.goto('/admin/lineups')
-    await expect(page.getByText('Administrator oversight')).toBeVisible()
     await expect(page.getByText('Alpha').first()).toBeVisible()
+    await expect(page.getByText('Submitted').first()).toBeVisible()
 
     // Open the isolated post-cutoff tie as an administrator (on behalf of Bravo).
     await page.goto('/manager/tie/e2e-tie-past2?team=e2e-b')

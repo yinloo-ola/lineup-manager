@@ -1,12 +1,8 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { resolveAsOf } from '@/domain/age'
 import { computeCutoff, isLocked } from '@/domain/cutoff'
-import {
-  buildAdminLineupRows,
-  type AdminLineupInput,
-  type AdminLineupRow,
-  type AdminTieInput
-} from '@/domain/adminView'
+import { type AdminLineupInput, type AdminTieInput } from '@/domain/adminView'
+import { buildMatchRows, type MatchRow } from '@/domain/matchesDashboard'
 import { emptyLineupFor } from '@/domain/lineupBuilder'
 import { parseTieFormat } from '@/domain/tieFormat'
 import { loadTieFormat } from '@/services/tieFormatService'
@@ -281,6 +277,7 @@ interface AdminLineupDbRow {
   team_id: string
   status: string
   player_ids: unknown
+  submitted_at: string | null
   updated_at: string
   updated_by: string | null
 }
@@ -292,18 +289,18 @@ interface AdminFormatDbRow {
 }
 
 /**
- * Every team's lineups with team/opponent/category, the tie's cutoff/locked
- * state, and a re-validated effective status — the administrator oversight view.
- * Admin RLS sees all rows.
+ * The Matches dashboard (ticket #14): one row per team match with each team's
+ * lineup status re-validated against the current structure. Admin RLS sees all
+ * rows; every query is scoped to the active tournament.
  */
-export async function fetchAdminLineups(
+export async function fetchMatches(
   client: SupabaseClient,
   tournamentId: string
-): Promise<AdminLineupRow[]> {
+): Promise<MatchRow[]> {
   const [lineupsRes, teamsRes, tiesRes, catsRes, formatsRes, playersRes, tourRes] = await Promise.all([
-    client.from('lineups').select('tie_id, team_id, status, player_ids, updated_at, updated_by').eq('tournament_id', tournamentId),
+    client.from('lineups').select('tie_id, team_id, status, player_ids, submitted_at, updated_at, updated_by').eq('tournament_id', tournamentId),
     client.from('teams').select('id, name').eq('tournament_id', tournamentId),
-    client.from('ties').select('id, category_id, scheduled_start, team_a, team_b').eq('tournament_id', tournamentId),
+    client.from('ties').select('id, category_id, scheduled_start, table_label, group_label, round_label, team_a, team_b').eq('tournament_id', tournamentId),
     client.from('categories').select('id, name').eq('tournament_id', tournamentId),
     client.from('tie_formats').select('category_id, rubbers, usage_policy, lead_time_minutes').eq('tournament_id', tournamentId),
     client.from('players').select('id, team_id, name, gender, date_of_birth').eq('tournament_id', tournamentId),
@@ -325,6 +322,7 @@ export async function fetchAdminLineups(
       teamId: l.team_id,
       status: parseStatus(l.status),
       playerIds: Array.isArray(l.player_ids) ? (l.player_ids as (string[] | null)[]) : [],
+      submittedAt: l.submitted_at,
       updatedAt: l.updated_at,
       updatedBy: l.updated_by ?? null
     })
@@ -333,6 +331,9 @@ export async function fetchAdminLineups(
     tieId: t.id,
     categoryId: t.category_id,
     scheduledStart: t.scheduled_start,
+    table: t.table_label ?? undefined,
+    group: t.group_label ?? undefined,
+    round: t.round_label ?? undefined,
     teamIds: [t.team_a, t.team_b]
   }))
   const teamNameById = new Map(
@@ -360,7 +361,7 @@ export async function fetchAdminLineups(
     rosterByTeam.set(p.team_id, arr)
   }
 
-  return buildAdminLineupRows({
+  return buildMatchRows({
     lineups,
     ties,
     teamNameById,
