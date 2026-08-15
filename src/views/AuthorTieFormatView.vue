@@ -43,9 +43,7 @@ const tournaments = useTournamentStore()
 
 // The freeze (spec §6): anchored on the tournament's start date — a tournament
 // without one has not started, so its formats stay editable.
-const frozen = computed(() =>
-  isFormatFrozen(tournaments.active?.startDate ?? null, new Date().toISOString().slice(0, 10))
-)
+const frozen = computed(() => isFormatFrozen(tournaments.active?.startDate ?? null))
 
 const USAGE_ITEMS: { title: string; value: UsagePolicy['kind'] }[] = [
   { title: 'At most once', value: 'at-most-once' },
@@ -216,7 +214,7 @@ async function doSave(fmt: TieFormat): Promise<void> {
   }
 }
 
-function fmtDate(iso: string): string {
+function formatScheduledStart(iso: string): string {
   return new Date(iso).toLocaleString()
 }
 </script>
@@ -350,7 +348,7 @@ function fmtDate(iso: string): string {
           <v-list density="compact" class="bg-grey-lighten-4 rounded">
             <v-list-item v-for="(b, i) in breaks" :key="i">
               <v-icon class="mr-2">mdi-sword-cross</v-icon>
-              {{ b.teamName }} vs {{ b.opponentName }} — {{ fmtDate(b.scheduledStart) }}
+              {{ b.teamName }} vs {{ b.opponentName }} — {{ formatScheduledStart(b.scheduledStart) }}
             </v-list-item>
           </v-list>
           <p class="text-caption text-medium-emphasis mt-2">

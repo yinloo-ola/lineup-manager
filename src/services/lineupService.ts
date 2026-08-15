@@ -1,8 +1,8 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { resolveAsOf } from '@/domain/age'
 import { computeCutoff, isLocked } from '@/domain/cutoff'
-import { type AdminLineupInput, type AdminTieInput } from '@/domain/adminView'
 import { buildMatchRows, type MatchRow } from '@/domain/matchesDashboard'
+import { fetchAdminScopeData, parseStatus } from '@/services/adminScope'
 import { emptyLineupFor } from '@/domain/lineupBuilder'
 import { parseTieFormat } from '@/domain/tieFormat'
 import { loadTieFormat } from '@/services/tieFormatService'
@@ -40,14 +40,7 @@ interface TeamRow {
   name: string
 }
 
-const STATUSES: LineupStatus[] = ['not-started', 'draft', 'submitted', 'invalidated']
-
 const TIE_NOT_FOUND = 'Tie not found (it may not belong to your team).'
-
-/** Coerce a stored status string into the domain union (unknown → draft). */
-function parseStatus(status: string): LineupStatus {
-  return STATUSES.includes(status as LineupStatus) ? (status as LineupStatus) : 'draft'
-}
 
 function toLineup(row: LineupRow): Lineup {
   const raw = Array.isArray(row.player_ids) ? (row.player_ids as (string[] | null)[]) : []
@@ -272,22 +265,6 @@ export async function submitLineup(
   await upsertLineup(client, lineup, tournamentId, 'submitted', new Date().toISOString())
 }
 
-interface AdminLineupDbRow {
-  tie_id: string
-  team_id: string
-  status: string
-  player_ids: unknown
-  submitted_at: string | null
-  updated_at: string
-  updated_by: string | null
-}
-interface AdminFormatDbRow {
-  category_id: string
-  rubbers: unknown
-  usage_policy: unknown
-  lead_time_minutes: number
-}
-
 /**
  * The Matches dashboard (ticket #14): one row per team match with each team's
  * lineup status re-validated against the current structure. Admin RLS sees all
@@ -297,79 +274,6 @@ export async function fetchMatches(
   client: SupabaseClient,
   tournamentId: string
 ): Promise<MatchRow[]> {
-  const [lineupsRes, teamsRes, tiesRes, catsRes, formatsRes, playersRes, tourRes] = await Promise.all([
-    client.from('lineups').select('tie_id, team_id, status, player_ids, submitted_at, updated_at, updated_by').eq('tournament_id', tournamentId),
-    client.from('teams').select('id, name').eq('tournament_id', tournamentId),
-    client.from('ties').select('id, category_id, scheduled_start, table_label, group_label, round_label, team_a, team_b').eq('tournament_id', tournamentId),
-    client.from('categories').select('id, name').eq('tournament_id', tournamentId),
-    client.from('tie_formats').select('category_id, rubbers, usage_policy, lead_time_minutes').eq('tournament_id', tournamentId),
-    client.from('players').select('id, team_id, name, gender, date_of_birth').eq('tournament_id', tournamentId),
-    client.from('tournaments').select('start_date').eq('id', tournamentId).maybeSingle()
-  ])
-  check(lineupsRes.error)
-  check(teamsRes.error)
-  check(tiesRes.error)
-  check(catsRes.error)
-  check(formatsRes.error)
-  check(playersRes.error)
-  check(tourRes.error)
-  const tournamentStart =
-    (tourRes.data as { start_date: string | null } | null)?.start_date ?? null
-
-  const lineups: AdminLineupInput[] = (lineupsRes.data as AdminLineupDbRow[] | null ?? []).map(
-    (l) => ({
-      tieId: l.tie_id,
-      teamId: l.team_id,
-      status: parseStatus(l.status),
-      playerIds: Array.isArray(l.player_ids) ? (l.player_ids as (string[] | null)[]) : [],
-      submittedAt: l.submitted_at,
-      updatedAt: l.updated_at,
-      updatedBy: l.updated_by ?? null
-    })
-  )
-  const ties: AdminTieInput[] = (tiesRes.data as TieRow[] | null ?? []).map((t) => ({
-    tieId: t.id,
-    categoryId: t.category_id,
-    scheduledStart: t.scheduled_start,
-    table: t.table_label ?? undefined,
-    group: t.group_label ?? undefined,
-    round: t.round_label ?? undefined,
-    teamIds: [t.team_a, t.team_b]
-  }))
-  const teamNameById = new Map(
-    (teamsRes.data as TeamRow[] | null ?? []).map((t) => [t.id, t.name])
-  )
-  const categoryNameById = new Map(
-    (catsRes.data as { id: string; name: string }[] | null ?? []).map((c) => [c.id, c.name])
-  )
-  const formats = formatsRes.data as AdminFormatDbRow[] | null ?? []
-  const leadTimeByCategory = new Map(formats.map((f) => [f.category_id, f.lead_time_minutes]))
-  const formatByCategory = new Map(
-    formats.map((f) => [
-      f.category_id,
-      parseTieFormat({
-        rubbers: f.rubbers,
-        usagePolicy: f.usage_policy ?? undefined,
-        leadTimeMinutes: f.lead_time_minutes
-      })
-    ])
-  )
-  const rosterByTeam = new Map<string, Player[]>()
-  for (const p of (playersRes.data as PlayerRow[] | null ?? [])) {
-    const arr = rosterByTeam.get(p.team_id) ?? []
-    arr.push({ id: p.id, name: p.name, gender: p.gender, dateOfBirth: p.date_of_birth })
-    rosterByTeam.set(p.team_id, arr)
-  }
-
-  return buildMatchRows({
-    lineups,
-    ties,
-    teamNameById,
-    categoryNameById,
-    leadTimeByCategory,
-    rosterByTeam,
-    formatByCategory,
-    tournamentStart,
-    now: new Date().toISOString()
-  })
+  const scope = await fetchAdminScopeData(client, tournamentId)
+  return buildMatchRows({ ...scope, now: new Date().toISOString() })
 }

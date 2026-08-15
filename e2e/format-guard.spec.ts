@@ -1,5 +1,5 @@
 import { test, expect, type Page } from '@playwright/test'
-import { apiToken, authHeaders, supabaseUrl } from './helpers'
+import { apiToken, authHeaders, signInAdmin, supabaseUrl } from './helpers'
 import { TEST_ADMIN_EMAIL, TEST_ADMIN_PASSWORD } from './global-setup'
 
 // Ticket #16: the guarded pre-start format edit + the freeze (spec §6). Uses
@@ -16,14 +16,6 @@ const TEAM_A = 'e2e-fg-a'
 const TEAM_B = 'e2e-fg-b'
 const TIE_ID = 'e2e-fg-tie'
 const PLAYER_ID = 'e2e-fg-p1'
-
-async function signInAdmin(page: Page): Promise<void> {
-  await page.goto('/login')
-  await page.getByRole('textbox', { name: /email/i }).fill(TEST_ADMIN_EMAIL)
-  await page.getByRole('textbox', { name: /password/i }).fill(TEST_ADMIN_PASSWORD)
-  await page.getByRole('button', { name: /sign in/i }).click()
-  await expect(page).toHaveURL(/\/matches$/)
-}
 
 /** Make the throwaway tournament the active one and land on its Matches page. */
 async function activate(page: Page): Promise<void> {
@@ -97,7 +89,7 @@ test.describe.serial('format guard + freeze (#16)', () => {
     page,
     request
   }) => {
-    await signInAdmin(page)
+    await signInAdmin(page, TEST_ADMIN_EMAIL, TEST_ADMIN_PASSWORD)
     await activate(page)
     await page.goto('/formats')
     await page.getByLabel('Team event').click()
@@ -142,7 +134,7 @@ test.describe.serial('format guard + freeze (#16)', () => {
     })
     expect(started.ok()).toBeTruthy()
 
-    await signInAdmin(page)
+    await signInAdmin(page, TEST_ADMIN_EMAIL, TEST_ADMIN_PASSWORD)
     await activate(page)
     await page.goto('/formats')
 

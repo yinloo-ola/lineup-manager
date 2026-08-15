@@ -8,7 +8,7 @@ import { computed, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { supabase } from '@/lib/supabase'
 import { useTournamentStore } from '@/stores/tournament'
-import { clearingStartDateError } from '@/domain/formatFreeze'
+import { startDateEditError } from '@/domain/formatFreeze'
 import { deleteReady, editUnchanged, renameError } from '@/domain/tournamentManage'
 
 const tournaments = useTournamentStore()
@@ -32,11 +32,7 @@ const editError = computed(() => {
   if (!active.value) return 'Name is required'
   return (
     renameError(editName.value, otherNames(active.value)) ??
-    clearingStartDateError(
-      active.value.startDate,
-      editDate.value,
-      new Date().toISOString().slice(0, 10)
-    )
+    startDateEditError(active.value.startDate, editDate.value)
   )
 })
 const editIsNoop = computed(() =>

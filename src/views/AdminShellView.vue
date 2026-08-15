@@ -19,9 +19,7 @@ const locationTitle = computed(() => (route.meta.title as string | undefined) ??
 const hasTournament = computed(() => tournaments.active !== null)
 // The format freeze (spec §6): the formats rail entry locks once the tournament
 // has started. A null start date (or no active tournament) means not started.
-const started = computed(() =>
-  isFormatFrozen(tournaments.active?.startDate ?? null, new Date().toISOString().slice(0, 10))
-)
+const started = computed(() => isFormatFrozen(tournaments.active?.startDate ?? null))
 
 async function onSignOut(): Promise<void> {
   await auth.signOut()

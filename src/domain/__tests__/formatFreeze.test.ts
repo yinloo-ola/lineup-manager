@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { breakingLineups, clearingStartDateError, isFormatFrozen } from '../formatFreeze'
+import { breakingLineups, isFormatFrozen, startDateEditError } from '../formatFreeze'
 import type { AdminLineupInput, AdminTieInput } from '../adminView'
 import type { Player, TieFormat } from '../types'
 
@@ -123,20 +123,25 @@ describe('breakingLineups', () => {
   })
 })
 
-describe('clearingStartDateError', () => {
+describe('startDateEditError', () => {
   it('blocks clearing the start date of a started tournament (the freeze anchor)', () => {
-    expect(clearingStartDateError('2026-08-01', '', '2026-08-15')).toMatch(/must keep its start date/)
+    expect(startDateEditError('2026-08-01', '', '2026-08-15')).toMatch(/must keep a start date in the past/)
   })
 
-  it('allows changing — but not clearing — a started tournament\'s start date', () => {
-    expect(clearingStartDateError('2026-08-01', '2026-08-02', '2026-08-15')).toBeNull()
+  it('blocks moving a started tournament\'s start date into the future — that lifts the freeze too', () => {
+    expect(startDateEditError('2026-08-01', '2099-01-01', '2026-08-15')).toMatch(/must keep a start date in the past/)
   })
 
-  it('allows clearing a start date that has not arrived (not yet started)', () => {
-    expect(clearingStartDateError('2099-01-01', '', '2026-08-15')).toBeNull()
+  it('allows editing within the past — the tournament stays started', () => {
+    expect(startDateEditError('2026-08-01', '2026-07-02', '2026-08-15')).toBeNull()
   })
 
-  it('allows clearing when no start date is set', () => {
-    expect(clearingStartDateError(null, '', '2026-08-15')).toBeNull()
+  it('allows any edit while the start date has not arrived (not yet started)', () => {
+    expect(startDateEditError('2099-01-01', '', '2026-08-15')).toBeNull()
+    expect(startDateEditError('2099-01-01', '2026-08-16', '2026-08-15')).toBeNull()
+  })
+
+  it('allows any edit when no start date is set', () => {
+    expect(startDateEditError(null, '', '2026-08-15')).toBeNull()
   })
 })

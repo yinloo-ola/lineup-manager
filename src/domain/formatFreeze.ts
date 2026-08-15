@@ -14,23 +14,30 @@
 import { buildAdminLineupRows, type BuildAdminLineupRowsArgs } from './adminView'
 import type { TieFormat } from './types'
 
-/** True once the tournament's start date is on or before `today` (yyyy-mm-dd). */
-export function isFormatFrozen(startDate: string | null, today: string): boolean {
+/** True once the tournament's start date is on or before `today` (yyyy-mm-dd).
+ *  `today` defaults to the current calendar date.
+ *  A null start date (or none at all) means not started. */
+export function isFormatFrozen(
+  startDate: string | null,
+  today: string = new Date().toISOString().slice(0, 10)
+): boolean {
   return startDate != null && startDate <= today
 }
 
 /**
- * The freeze's anchor rule: a STARTED tournament must keep its start date —
- * clearing it would silently lift the freeze. Returns the error message when
- * the next edit would do that, else null.
+ * The freeze's anchor rule: a STARTED tournament must stay started — clearing
+ * the start date or moving it into the future would silently lift the freeze
+ * its formats are frozen against. Returns the error message when the proposed
+ * edit would do that, else null.
  */
-export function clearingStartDateError(
+export function startDateEditError(
   startDate: string | null,
   nextStartDate: string,
-  today: string
+  today: string = new Date().toISOString().slice(0, 10)
 ): string | null {
-  if (!isFormatFrozen(startDate, today) || nextStartDate !== '') return null
-  return 'A started tournament must keep its start date — Team Match Formats are frozen against it'
+  if (!isFormatFrozen(startDate, today)) return null
+  if (isFormatFrozen(nextStartDate === '' ? null : nextStartDate, today)) return null
+  return 'A started tournament must keep a start date in the past — its Team Match Formats are frozen against it'
 }
 
 /** One submitted lineup the proposed format would break, with its team match. */

@@ -67,3 +67,19 @@ export async function signInManager(page: Page, email: string, password: string)
   await page.getByRole('button', { name: /sign in/i }).click()
   await expect(page).toHaveURL(/\/manager$/)
 }
+
+/**
+ * Sign in as the administrator and land on the setup-aware landing surface:
+ * Matches when a tournament exists (the global-setup fixtures guarantee one).
+ */
+export async function signInAdmin(
+  page: Page,
+  email: string,
+  password: string
+): Promise<void> {
+  await page.goto('/login')
+  await page.getByRole('textbox', { name: /email/i }).fill(email)
+  await page.getByRole('textbox', { name: /password/i }).fill(password)
+  await page.getByRole('button', { name: /sign in/i }).click()
+  await expect(page).toHaveURL(/\/matches$/)
+}
