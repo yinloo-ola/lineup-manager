@@ -15,14 +15,15 @@ async function signInAdmin(page: import('@playwright/test').Page): Promise<void>
   await expect(page).toHaveURL(/\/$/)
 }
 
-/** A minimal valid seed whose ids are stable (the import remints them anyway). */
+/** A minimal valid v1 seed whose ids are stable (the import remints them anyway). */
 function seedJson(tournamentName: string): string {
   return JSON.stringify({
+    seedVersion: 1,
     tournamentName,
     categories: [{ id: 'imp-cat', name: "Men's Team", shortName: 'MT' }],
     teams: [
-      { id: 'imp-t1', name: 'Importers' },
-      { id: 'imp-t2', name: 'Rivals' }
+      { id: 'imp-t1', name: 'Importers', managerEmail: 'importers@example.test' },
+      { id: 'imp-t2', name: 'Rivals', managerEmail: 'rivals@example.test' }
     ],
     players: [
       { id: 'imp-p1', teamId: 'imp-t1', name: 'Ian', gender: 'M', dateOfBirth: '1990-01-01' }
@@ -33,6 +34,8 @@ function seedJson(tournamentName: string): string {
         categoryId: 'imp-cat',
         scheduledStart: '2026-08-20T10:00',
         table: '1',
+        group: 'A',
+        round: '1',
         teamIds: ['imp-t1', 'imp-t2']
       }
     ]

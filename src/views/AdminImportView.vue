@@ -100,17 +100,19 @@ function cancelRename() {
         <v-card elevation="2" rounded="lg">
           <v-card-text>
             <p class="text-body-2 mb-4">
-              Paste the seed JSON exported from tournament-manager (or load a <code>.json</code>
-              file). Each import creates a <strong>new tournament</strong> named from
-              <code>tournamentName</code> — re-importing the same file makes a second tournament, it
-              never overwrites.
+              Paste the tournament JSON exported from tournament-manager (or load a
+              <code>.json</code> file). Each import creates a <strong>new tournament</strong> named
+              from <code>tournamentName</code> — re-importing the same file makes a second
+              tournament, it never overwrites. Every team carries its manager's email, so
+              provisioning is pre-filled after import. Contract:
+              <code>docs/seed-contract.md</code>.
             </p>
             <v-textarea
               v-model="jsonText"
-              label="Seed JSON"
+              label="Tournament JSON"
               rows="12"
               spellcheck="false"
-              placeholder='{ "tournamentName": "…", "categories": […], "teams": […], "players": […], "ties": […] }'
+              placeholder='{ "seedVersion": 1, "tournamentName": "…", "categories": […], "teams": [{ …, "managerEmail": "…" }], "players": […], "ties": […] }'
             />
             <input
               type="file"
