@@ -8,6 +8,7 @@ import { computed, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { supabase } from '@/lib/supabase'
 import { useTournamentStore } from '@/stores/tournament'
+import { clearingStartDateError } from '@/domain/formatFreeze'
 import { deleteReady, editUnchanged, renameError } from '@/domain/tournamentManage'
 
 const tournaments = useTournamentStore()
@@ -25,9 +26,19 @@ const saving = ref(false)
 
 // Names of every OTHER tournament — passed to renameError so keeping the current
 // name is always valid, but a case-folded clash with a sibling is blocked.
-const editError = computed(() =>
-  active.value ? renameError(editName.value, otherNames(active.value)) : 'Name is required'
-)
+// Clearing the start date of a STARTED tournament is also blocked: it anchors
+// the format freeze, and clearing it would silently lift that freeze.
+const editError = computed(() => {
+  if (!active.value) return 'Name is required'
+  return (
+    renameError(editName.value, otherNames(active.value)) ??
+    clearingStartDateError(
+      active.value.startDate,
+      editDate.value,
+      new Date().toISOString().slice(0, 10)
+    )
+  )
+})
 const editIsNoop = computed(() =>
   active.value ? editUnchanged(active.value, { name: editName.value, startDate: editDate.value }) : true
 )

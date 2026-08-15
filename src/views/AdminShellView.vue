@@ -7,6 +7,7 @@ import { computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { useTournamentStore } from '@/stores/tournament'
+import { isFormatFrozen } from '@/domain/formatFreeze'
 import TournamentSelector from '@/components/TournamentSelector.vue'
 
 const route = useRoute()
@@ -16,13 +17,10 @@ const tournaments = useTournamentStore()
 
 const locationTitle = computed(() => (route.meta.title as string | undefined) ?? 'Matches')
 const hasTournament = computed(() => tournaments.active !== null)
-const today = new Date().toISOString().slice(0, 10)
-// The format-freeze hook (spec §6): once started, the formats entry locks.
-// Ticket 16 replaces this date check with the freeze rule itself. The loose
-// null check also covers "no active tournament" (the empty state).
-const started = computed(
-  () =>
-    tournaments.active?.startDate != null && tournaments.active.startDate <= today
+// The format freeze (spec §6): the formats rail entry locks once the tournament
+// has started. A null start date (or no active tournament) means not started.
+const started = computed(() =>
+  isFormatFrozen(tournaments.active?.startDate ?? null, new Date().toISOString().slice(0, 10))
 )
 
 async function onSignOut(): Promise<void> {
