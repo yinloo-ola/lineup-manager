@@ -18,9 +18,11 @@ const locationTitle = computed(() => (route.meta.title as string | undefined) ??
 const hasTournament = computed(() => tournaments.active !== null)
 const today = new Date().toISOString().slice(0, 10)
 // The format-freeze hook (spec §6): once started, the formats entry locks.
-// Ticket 16 replaces this date check with the freeze rule itself.
+// Ticket 16 replaces this date check with the freeze rule itself. The loose
+// null check also covers "no active tournament" (the empty state).
 const started = computed(
-  () => tournaments.active?.startDate !== null && tournaments.active!.startDate! <= today
+  () =>
+    tournaments.active?.startDate != null && tournaments.active.startDate <= today
 )
 
 async function onSignOut(): Promise<void> {

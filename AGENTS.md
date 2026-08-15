@@ -37,7 +37,7 @@ The Supabase CLI is not installed globally — always `npx -y supabase …`.
 - `src/domain/` — pure logic, the primary test seam. **No UI, no Supabase imports.** camelCase domain types.
 - `src/services/` — DB access via `supabase-js`; maps snake_case rows ↔ camelCase domain; scopes every query.
 - `src/stores/` — Pinia (`auth`, `tournament`). Active-tournament scope persists to localStorage.
-- `src/views/` + `src/components/` — Vuetify 3; each admin view has its own app bar with `TournamentSelector`.
+- `src/views/` + `src/components/` — Vuetify 3; admin pages render inside the shared shell (`AdminShellView` — rail + app bar with `TournamentSelector`; spec: `.scratch/ux-streamline/spec.md`).
 - `supabase/migrations/` — imperative SQL migrations, comment header per ticket, follow existing policy/grant style. `supabase/functions/` — Deno edge functions (service-role; mirror `provision-manager`'s caller-JWT authorization pattern).
 - `e2e/` — Playwright; `global-setup.ts` provisions all fixtures.
 

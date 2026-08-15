@@ -25,6 +25,12 @@ const today = new Date().toISOString().slice(0, 10)
 // Grouped per the domain rule; headers drop out when their group is empty; the
 // create entry always stays. Built-in filtering is disabled — this is the only
 // filter. Subtitles carry the start date so same-named years differ at a glance.
+const toItem = (t: { id: string; name: string; startDate: string | null }) => ({
+  title: t.name,
+  value: t.id,
+  props: { subtitle: t.startDate ?? 'no start date' }
+})
+
 const items = computed(() => {
   const { live, past } = groupTournaments(store.tournaments, {
     today,
@@ -32,25 +38,11 @@ const items = computed(() => {
   })
   const out: Array<Record<string, unknown>> = []
   if (live.length) {
-    out.push({ header: 'Active & upcoming' })
-    out.push(
-      ...live.map((t) => ({
-        title: t.name,
-        value: t.id,
-        props: { subtitle: t.startDate ?? 'no start date' }
-      }))
-    )
+    out.push({ header: 'Active & upcoming' }, ...live.map(toItem))
   }
   if (search.value.trim()) {
     if (past.length) {
-      out.push({ header: 'Past' })
-      out.push(
-        ...past.map((t) => ({
-          title: t.name,
-          value: t.id,
-          props: { subtitle: t.startDate ?? 'no start date' }
-        }))
-      )
+      out.push({ header: 'Past' }, ...past.map(toItem))
     }
   } else {
     out.push({

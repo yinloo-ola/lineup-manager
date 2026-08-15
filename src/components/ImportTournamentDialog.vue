@@ -66,7 +66,7 @@ async function doImport(seed: SeedFile, name: string): Promise<void> {
   jsonText.value = ''
   result.value = {
     ok: true,
-    message: `Tournament “${name.trim()}” created — ${seed.categories.length} categories, ${seed.teams.length} teams, ${seed.players.length} players, ${seed.ties.length} team matches.`
+    message: `Tournament “${name.trim()}” created — ${seed.categories.length} team events, ${seed.teams.length} teams, ${seed.players.length} players, ${seed.ties.length} team matches.`
   }
   emit('imported')
 }
@@ -121,7 +121,13 @@ function cancelRename(): void {
           spellcheck="false"
           placeholder='{ "seedVersion": 1, "tournamentName": "…", "categories": […], "teams": [{ …, "managerEmail": "…" }], "players": […], "ties": […] }'
         />
-        <input type="file" accept=".json,application/json" class="mt-2" @change="onFile" />
+        <input
+          type="file"
+          accept=".json,application/json"
+          aria-label="Tournament file"
+          class="mt-2"
+          @change="onFile"
+        />
 
         <!-- Name-clash resolution: show the existing name + a rename field. -->
         <v-alert v-if="pendingSeed" type="warning" variant="tonal" class="mt-4" border>
