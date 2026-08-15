@@ -2,13 +2,14 @@ import { test, expect } from '@playwright/test'
 import { apiToken, authHeaders, supabaseAnonKey, supabaseUrl } from './helpers'
 import { TEST_ADMIN_EMAIL, TEST_ADMIN_PASSWORD } from './global-setup'
 
-// Ticket #15: manage & delete tournaments. Renames via the edit dialog
-// (uniqueness-checked), and deletes via the double-confirm dialog — exercising
-// the real delete-tournament edge function (manager auth accounts removed) and
-// the active-tournament fall-back. Uses its OWN throwaway tournament so the
-// shared global-setup fixtures ("Default", "E2E Other") are never touched.
+// Ticket #15: Tournament settings manages the SELECTED tournament (no list).
+// Renames via the edit dialog (uniqueness-checked), and deletes via the
+// double-confirm dialog — exercising the real delete-tournament edge function
+// (manager auth accounts removed) and the active-tournament fall-back. Uses its
+// OWN throwaway tournament so the shared global-setup fixtures ("Default",
+// "E2E Other") are never touched.
 //
-// CI runs against a fresh stack each time. For local re-runs after a partial
+// CI runs against a fresh stack every time. For local re-runs after a partial
 // run, reset first: `supabase db reset && npm run test:e2e`.
 
 const TOUR_ID = 'e2e-mg-tour'
@@ -23,7 +24,18 @@ async function signInAdmin(page: import('@playwright/test').Page): Promise<void>
   await page.getByRole('textbox', { name: /email/i }).fill(TEST_ADMIN_EMAIL)
   await page.getByRole('textbox', { name: /password/i }).fill(TEST_ADMIN_PASSWORD)
   await page.getByRole('button', { name: /sign in/i }).click()
-  await expect(page).toHaveURL(/\/$/)
+  // Setup-aware landing: a tournament exists → Matches.
+  await expect(page).toHaveURL(/\/matches$/)
+}
+
+/** Open Tournament settings with `name` as the SELECTED tournament. */
+async function openSettings(page: import('@playwright/test').Page, name: string): Promise<void> {
+  await page.goto('/settings')
+  await page.getByRole('combobox', { name: 'Tournament' }).click({ force: true })
+  // The selector's options carry a start-date subtitle, so match on the name.
+  await page.getByRole('option', { name, exact: false }).click()
+  // The app bar names where the admin is and which tournament is active.
+  await expect(page.getByText(`Tournament settings · ${name}`)).toBeVisible()
 }
 
 test.describe.serial('manage & delete tournaments (#15)', () => {
@@ -55,10 +67,9 @@ test.describe.serial('manage & delete tournaments (#15)', () => {
     page
   }) => {
     await signInAdmin(page)
-    await page.goto('/manage')
-    await expect(page.getByRole('button', { name: `Edit ${TOUR_NAME}`, exact: true })).toBeVisible()
+    await openSettings(page, TOUR_NAME)
 
-    await page.getByRole('button', { name: `Edit ${TOUR_NAME}`, exact: true }).click()
+    await page.getByRole('button', { name: 'Edit name / start date' }).click()
 
     // Duplicate rejection: renaming to an existing sibling's name is blocked.
     await page.getByLabel('Tournament name').fill('Default')
@@ -70,13 +81,10 @@ test.describe.serial('manage & delete tournaments (#15)', () => {
     await page.getByRole('textbox', { name: 'Start date' }).fill('2026-03-20')
     await page.getByRole('button', { name: 'Save', exact: true }).click()
 
-    // The list re-renders under the new name with the start date shown; the
-    // old-named edit button is gone.
-    await expect(page.getByRole('button', { name: `Edit ${RENAMED}`, exact: true })).toBeVisible()
-    await expect(
-      page.getByText(`Start date: Mar 20, 2026`, { exact: false })
-    ).toBeVisible()
-    await expect(page.getByRole('button', { name: `Edit ${TOUR_NAME}`, exact: true })).toHaveCount(0)
+    // The settings card and the app bar re-render under the new name, with the
+    // start date shown.
+    await expect(page.getByText(`Tournament settings · ${RENAMED}`)).toBeVisible()
+    await expect(page.getByText(`Start date: Mar 20, 2026`, { exact: false })).toBeVisible()
   })
 
   test('admin deletes a tournament — cascade + manager lock-out + fall-back', async ({
@@ -88,21 +96,21 @@ test.describe.serial('manage & delete tournaments (#15)', () => {
     expect(before).not.toBeNull()
 
     await signInAdmin(page)
-
-    // Make the soon-to-be-deleted tournament the ACTIVE one, so fall-back is exercised.
-    await page.goto('/manage')
-    await page.getByRole('combobox', { name: 'Tournament' }).click({ force: true })
-    await page.getByRole('option', { name: RENAMED, exact: true }).click()
+    // The soon-to-be-deleted tournament is the SELECTED one, so fall-back is exercised.
+    await openSettings(page, RENAMED)
 
     // Open the delete dialog and complete the double-confirm gate.
-    await page.getByRole('button', { name: `Delete ${RENAMED}`, exact: true }).click()
+    await page.getByRole('button', { name: 'Delete tournament', exact: true }).click()
     await expect(page.getByText(/all team manager accounts/i)).toBeVisible()
     await page.getByLabel(/I understand this cannot be recovered/i).check()
     await page.getByLabel(`Type ${RENAMED} to confirm`).fill(RENAMED)
-    await page.getByRole('button', { name: 'Delete tournament', exact: true }).click()
+    // Scoped to the dialog: the page behind it also has a "Delete tournament" button.
+    await page.getByRole('dialog').getByRole('button', { name: 'Delete tournament' }).click()
 
-    // Removed from the management list.
-    await expect(page.getByRole('button', { name: `Delete ${RENAMED}`, exact: true })).toHaveCount(0)
+    // Delete confirmed; the active tournament fell back to another one (Default
+    // is the store's first-by-name fallback) — the app bar names it.
+    await expect(page.getByText('Tournament settings · Default')).toBeVisible()
+    await expect(page.getByText(`Tournament settings · ${RENAMED}`)).toHaveCount(0)
 
     // The manager can no longer sign in — the edge function removed the account.
     const after = await request.post(`${supabaseUrl}/auth/v1/token?grant_type=password`, {

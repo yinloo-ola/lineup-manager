@@ -190,7 +190,7 @@ describe('tryAssign — cross-slot double-booking', () => {
       })
     )
     expect(r.ok).toBe(false)
-    if (!r.ok) expect(r.reason).toMatch(/double|slot|tie/i)
+    if (!r.ok) expect(r.reason).toMatch(/team matches sharing a start time/i)
   })
 
   it('allows a player whose other tie is in a different time slot', () => {
@@ -339,7 +339,7 @@ describe('canSubmit', () => {
       teamLineups: [other]
     })
     expect(r.ok).toBe(false)
-    if (!r.ok) expect(r.reasons.join(' ')).toMatch(/double|slot|tie/i)
+    if (!r.ok) expect(r.reasons.join(' ')).toMatch(/team matches sharing a start time/i)
   })
 })
 

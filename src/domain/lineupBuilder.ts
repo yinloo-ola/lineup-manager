@@ -74,7 +74,7 @@ export function tryAssign(args: TryAssignArgs): TryAssignResult {
   const { tieFormat, tie, roster, asOf, lineup, rubberIndex, playerId, teamTies, teamLineups } = args
 
   if (rubberIndex < 0 || rubberIndex >= tieFormat.rubbers.length) {
-    return { ok: false, reason: `Rubber ${rubberIndex} does not exist in this Tie Format.` }
+    return { ok: false, reason: `Match ${rubberIndex + 1} does not exist in this Team Match Format.` }
   }
   if (!roster.some((p) => p.id === playerId)) {
     return { ok: false, reason: `Player ${playerId} is not on your roster.` }

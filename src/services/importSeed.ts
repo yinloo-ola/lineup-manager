@@ -1,5 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { SeedFile } from '@/domain/seed'
+import { resolveStartDate } from '@/domain/seed'
 import { nameClashes } from '@/domain/tournamentManage'
 
 // The case-folded clash rule lives in the domain (shared with the rename path);
@@ -13,7 +14,13 @@ export { nameClashes }
  */
 export interface TablePayloads {
   categories: { id: string; tournament_id: string; name: string; short_name: string }[]
-  teams: { id: string; tournament_id: string; name: string; club: string | null }[]
+  teams: {
+    id: string
+    tournament_id: string
+    name: string
+    club: string | null
+    manager_email: string
+  }[]
   players: {
     id: string
     tournament_id: string
@@ -28,6 +35,8 @@ export interface TablePayloads {
     category_id: string
     scheduled_start: string
     table_label: string | null
+    group_label: string | null
+    round_label: string | null
     team_a: string
     team_b: string
   }[]
@@ -82,7 +91,8 @@ export function toTablePayloads(
       id: freshId(t.id),
       tournament_id: tournamentId,
       name: t.name,
-      club: t.club ?? null
+      club: t.club ?? null,
+      manager_email: t.managerEmail
     })),
     players: seed.players.map((p) => ({
       id: freshId(p.id),
@@ -98,6 +108,8 @@ export function toTablePayloads(
       category_id: freshId(t.categoryId),
       scheduled_start: t.scheduledStart,
       table_label: t.table ?? null,
+      group_label: t.group ?? null,
+      round_label: t.round ?? null,
       team_a: freshId(t.teamIds[0]),
       team_b: freshId(t.teamIds[1])
     }))
@@ -144,9 +156,12 @@ export async function importSeed(
     ['ties', payloads.ties]
   ]
 
-  const { error: tourError } = await client
-    .from('tournaments')
-    .insert({ id: tournamentId, name: resolvedName.trim() })
+  const { error: tourError } = await client.from('tournaments').insert({
+    id: tournamentId,
+    name: resolvedName.trim(),
+    // Seed's own startDate or the earliest team match's day (spec §8).
+    start_date: resolveStartDate(seed)
+  })
   if (tourError) {
     throw new Error(`Import failed — tournaments: ${tourError.message}`)
   }

@@ -1,0 +1,89 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://lineup-manager/seed-contract.schema.json",
+  "title": "Seed contract v1",
+  "description": "The tournament JSON exported by the organizer tool (tournament-manager) and imported here via 'Import tournament…'. Canonical doc: docs/seed-contract.md. Enforced by src/domain/seed.ts (parseSeed).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["seedVersion", "tournamentName", "categories", "teams", "players", "ties"],
+  "properties": {
+    "seedVersion": { "const": 1 },
+    "tournamentName": { "type": "string" },
+    "startDate": {
+      "type": "string",
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+      "description": "Optional. When absent the import derives the start date from the earliest scheduledStart."
+    },
+    "categories": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "name", "shortName"],
+        "properties": {
+          "id": { "type": "string" },
+          "name": { "type": "string" },
+          "shortName": { "type": "string" }
+        }
+      }
+    },
+    "teams": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "name", "managerEmail"],
+        "properties": {
+          "id": { "type": "string" },
+          "name": { "type": "string" },
+          "club": { "type": "string" },
+          "managerEmail": {
+            "type": "string",
+            "pattern": "^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$",
+            "description": "One manager per team; unique across teams (case-insensitive, enforced by the parser)."
+          }
+        }
+      }
+    },
+    "players": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "teamId", "name", "gender", "dateOfBirth"],
+        "properties": {
+          "id": { "type": "string" },
+          "teamId": { "type": "string" },
+          "name": { "type": "string" },
+          "gender": { "type": "string" },
+          "dateOfBirth": {
+            "type": "string",
+            "description": "yyyy-mm-dd, or an Excel serial-day number (normalized on import)."
+          }
+        }
+      }
+    },
+    "ties": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "categoryId", "scheduledStart", "teamIds"],
+        "properties": {
+          "id": { "type": "string" },
+          "categoryId": { "type": "string" },
+          "scheduledStart": { "type": "string" },
+          "table": { "type": "string" },
+          "group": { "type": "string", "description": "Human label; absent for knockout ties." },
+          "round": { "type": "string" },
+          "teamIds": {
+            "type": "array",
+            "minItems": 2,
+            "maxItems": 2,
+            "items": { "type": "string" }
+          }
+        }
+      }
+    }
+  }
+}

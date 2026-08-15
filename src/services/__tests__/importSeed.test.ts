@@ -3,11 +3,13 @@ import { buildIdMap, nameClashes, toTablePayloads } from '../importSeed'
 import { parseSeed, type SeedFile } from '@/domain/seed'
 
 const seed = parseSeed({
+  seedVersion: 1,
   tournamentName: 'Summer Open',
+  startDate: '2026-08-19',
   categories: [{ id: 'c1', name: "Men's Team", shortName: 'MT' }],
   teams: [
-    { id: 'tA', name: 'Team A', club: 'Club A' },
-    { id: 'tB', name: 'Team B' }
+    { id: 'tA', name: 'Team A', club: 'Club A', managerEmail: 'a@club.example' },
+    { id: 'tB', name: 'Team B', managerEmail: 'b@club.example' }
   ],
   players: [{ id: 'p1', teamId: 'tA', name: 'Alice', gender: 'F', dateOfBirth: '1990-01-01' }],
   ties: [
@@ -16,6 +18,8 @@ const seed = parseSeed({
       categoryId: 'c1',
       scheduledStart: '2026-08-20T10:00',
       table: '1',
+      group: 'A',
+      round: '1',
       teamIds: ['tA', 'tB']
     }
   ]
@@ -86,8 +90,20 @@ describe('toTablePayloads', () => {
       short_name: 'MT'
     })
     expect(p.teams).toEqual([
-      { id: idMap.get('tA'), tournament_id: tournamentId, name: 'Team A', club: 'Club A' },
-      { id: idMap.get('tB'), tournament_id: tournamentId, name: 'Team B', club: null }
+      {
+        id: idMap.get('tA'),
+        tournament_id: tournamentId,
+        name: 'Team A',
+        club: 'Club A',
+        manager_email: 'a@club.example'
+      },
+      {
+        id: idMap.get('tB'),
+        tournament_id: tournamentId,
+        name: 'Team B',
+        club: null,
+        manager_email: 'b@club.example'
+      }
     ])
     // player.team_id follows its team's remapped id.
     expect(p.players[0]).toEqual({
@@ -105,6 +121,8 @@ describe('toTablePayloads', () => {
       category_id: idMap.get('c1'),
       scheduled_start: '2026-08-20T10:00',
       table_label: '1',
+      group_label: 'A',
+      round_label: '1',
       team_a: idMap.get('tA'),
       team_b: idMap.get('tB')
     })
@@ -112,11 +130,12 @@ describe('toTablePayloads', () => {
 
   it('nulls out optional fields that were omitted', () => {
     const minimalSeed: SeedFile = parseSeed({
+      seedVersion: 1,
       tournamentName: 'X',
       categories: [{ id: 'c', name: 'C', shortName: 'C' }],
       teams: [
-        { id: 'a', name: 'A' },
-        { id: 'b', name: 'B' }
+        { id: 'a', name: 'A', managerEmail: 'a@x.example' },
+        { id: 'b', name: 'B', managerEmail: 'b@x.example' }
       ],
       players: [],
       ties: [
@@ -127,6 +146,8 @@ describe('toTablePayloads', () => {
     const p = toTablePayloads(minimalSeed, tournamentId, idMap)
     expect(p.teams[0].club).toBeNull()
     expect(p.ties[0].table_label).toBeNull()
+    expect(p.ties[0].group_label).toBeNull()
+    expect(p.ties[0].round_label).toBeNull()
   })
 })
 

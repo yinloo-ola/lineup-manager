@@ -84,6 +84,15 @@ const issues = computed<Violation[]>(() =>
 const effective = computed(
   () => effectiveStatus(working.value?.status ?? 'not-started', violations.value)
 )
+// On-screen status vocabulary (spec §2): Submitted / Not submitted everywhere,
+// Draft only inside the builder; raw enum strings never reach the screen.
+const statusLabel = computed(() =>
+  effective.value === 'submitted'
+    ? 'Submitted'
+    : effective.value === 'invalidated'
+      ? 'Not submitted'
+      : 'Draft'
+)
 const rubberIssues = computed<Violation[][]>(() => {
   const byRubber: Violation[][] = []
   for (const v of issues.value) {
@@ -239,7 +248,7 @@ onMounted(load)
         <template v-else>Lineup</template>
       </v-app-bar-title>
       <template #append>
-        <v-btn variant="text" prepend-icon="mdi-arrow-left" :to="auth.isAdmin ? '/admin/lineups' : { name: 'manager' }">Back</v-btn>
+        <v-btn variant="text" prepend-icon="mdi-arrow-left" :to="auth.isAdmin ? '/matches' : { name: 'manager' }">Back</v-btn>
       </template>
     </v-app-bar>
 
@@ -265,7 +274,7 @@ onMounted(load)
             <v-card elevation="1" rounded="lg">
               <v-card-item>
                 <v-card-title class="text-h6">
-                  Rubber {{ i + 1 }} <span class="text-medium-emphasis text-body-2">· {{ rubberSummary(rubber) }}</span>
+                  Match {{ i + 1 }} <span class="text-medium-emphasis text-body-2">· {{ rubberSummary(rubber) }}</span>
                 </v-card-title>
                 <v-card-subtitle>{{ expectedSlots(rubber) }} player(s)</v-card-subtitle>
               </v-card-item>
@@ -322,14 +331,17 @@ onMounted(load)
             </v-card-item>
             <v-card-text>
               <v-chip
-                :color="effective === 'invalidated' ? 'red' : effective === 'submitted' ? 'green' : complete ? 'green' : 'amber'"
+                :color="effective === 'submitted' ? 'green' : effective === 'invalidated' ? 'error' : 'amber'"
                 variant="tonal"
                 class="mr-2"
               >
-                {{ effective }}
+                {{ statusLabel }}
               </v-chip>
-              <v-chip v-if="effective !== 'submitted'" :color="complete ? 'green' : 'amber'" variant="tonal">
-                {{ complete ? 'complete' : 'incomplete' }}
+              <v-chip v-if="effective === 'invalidated'" color="warning" variant="tonal">
+                Needs attention
+              </v-chip>
+              <v-chip v-else-if="effective !== 'submitted'" :color="complete ? 'green' : 'amber'" variant="tonal">
+                {{ complete ? 'Ready to submit' : 'Not ready to submit' }}
               </v-chip>
               <p v-if="working.submittedAt" class="text-body-2 text-medium-emphasis mt-2">
                 Submitted {{ fmt(working.submittedAt) }}
@@ -342,7 +354,7 @@ onMounted(load)
                 density="comfortable"
                 class="mt-3"
               >
-                Invalidated — action needed. The Tie Format changed and this submitted lineup no
+                Needs attention — the Team Match Format changed and this submitted lineup no
                 longer satisfies the rules. Recall it to draft, fix the issues below, and re-submit.
               </v-alert>
 

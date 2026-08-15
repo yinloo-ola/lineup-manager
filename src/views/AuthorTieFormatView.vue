@@ -1,10 +1,16 @@
 <script setup lang="ts">
-import { onMounted, ref, watch } from 'vue'
+// Team match format authoring (spec §7) plus the two format rules of spec §6
+// (ticket #16): the FREEZE — once the tournament has started (anchored on its
+// start date) the page is disabled with its reason — and the GUARDED pre-start
+// edit — a save that would break submitted lineups first shows an impact
+// preview and requires explicit confirmation. No silent invalidation: a
+// confirmed break surfaces downstream as Needs attention.
+import { computed, onMounted, ref, watch } from 'vue'
 import { supabase } from '@/lib/supabase'
 import { useTournamentStore } from '@/stores/tournament'
-import TournamentSelector from '@/components/TournamentSelector.vue'
+import { isFormatFrozen, type FormatBreak } from '@/domain/formatFreeze'
 import { parseTieFormat } from '@/domain/tieFormat'
-import { loadTieFormat, saveTieFormat } from '@/services/tieFormatService'
+import { loadTieFormat, previewFormatImpact, saveTieFormat } from '@/services/tieFormatService'
 import type { Constraint, PairRule, Rubber, RubberFormat, TieFormat, UsagePolicy } from '@/domain/types'
 
 interface Category {
@@ -29,10 +35,26 @@ const maxSingles = ref('')
 const maxDoubles = ref('')
 const rubbers = ref<EditRubber[]>([])
 const saving = ref(false)
+const previewing = ref(false)
 const loadingFmt = ref(false)
 const result = ref<{ ok: boolean; message: string } | null>(null)
 
 const tournaments = useTournamentStore()
+
+// The freeze (spec §6): anchored on the tournament's start date — a tournament
+// without one has not started, so its formats stay editable.
+const frozen = computed(() => isFormatFrozen(tournaments.active?.startDate ?? null))
+
+const USAGE_ITEMS: { title: string; value: UsagePolicy['kind'] }[] = [
+  { title: 'At most once', value: 'at-most-once' },
+  { title: 'Max matches', value: 'max-rubbers' },
+  { title: 'Singles + doubles caps', value: 'singles-plus-doubles' }
+]
+
+// --- the guarded save's confirm dialog ---
+const confirming = ref(false)
+const pendingFmt = ref<TieFormat | null>(null)
+const breaks = ref<FormatBreak[]>([])
 
 async function loadCategories(): Promise<void> {
   if (!tournaments.activeId) {
@@ -135,7 +157,7 @@ function build(): TieFormat {
 async function onSave() {
   result.value = null
   const tournamentId = tournaments.activeId
-  if (!selectedCategory.value || !tournamentId) return
+  if (!selectedCategory.value || !tournamentId || frozen.value) return
   let fmt: TieFormat
   try {
     fmt = parseTieFormat(build()) // validate the editor output before saving
@@ -143,38 +165,77 @@ async function onSave() {
     result.value = { ok: false, message: `Invalid: ${(e as Error).message}` }
     return
   }
+  // The guard (spec §6): preview the impact before saving. A breaking save
+  // needs explicit confirmation; cancel leaves everything untouched.
+  previewing.value = true
+  try {
+    const impact = await previewFormatImpact(supabase, tournamentId, selectedCategory.value, fmt)
+    if (impact.length > 0) {
+      pendingFmt.value = fmt
+      breaks.value = impact
+      confirming.value = true
+      return
+    }
+    await doSave(fmt)
+  } catch (e) {
+    result.value = { ok: false, message: (e as Error).message }
+  } finally {
+    previewing.value = false
+  }
+}
+
+async function onConfirm(): Promise<void> {
+  const fmt = pendingFmt.value
+  confirming.value = false
+  if (!fmt) return
+  pendingFmt.value = null
+  breaks.value = []
+  await doSave(fmt)
+}
+
+function onCancelConfirm(): void {
+  confirming.value = false
+  pendingFmt.value = null
+  breaks.value = []
+}
+
+async function doSave(fmt: TieFormat): Promise<void> {
+  const tournamentId = tournaments.activeId
+  const category = selectedCategory.value
+  if (!tournamentId || !category) return
   saving.value = true
   try {
-    await saveTieFormat(supabase, tournamentId, selectedCategory.value, fmt)
-    result.value = { ok: true, message: `Saved ${fmt.rubbers.length} rubber(s), lead time ${fmt.leadTimeMinutes} min.` }
+    await saveTieFormat(supabase, tournamentId, category, fmt)
+    result.value = { ok: true, message: `Saved ${fmt.rubbers.length} match(es), cutoff lead time ${fmt.leadTimeMinutes} min.` }
   } catch (e) {
     result.value = { ok: false, message: (e as Error).message }
   } finally {
     saving.value = false
   }
 }
+
+function formatScheduledStart(iso: string): string {
+  return new Date(iso).toLocaleString()
+}
 </script>
 
 <template>
   <v-container>
-    <v-app-bar flat color="surface">
-      <v-app-bar-title>Author Tie Format</v-app-bar-title>
-      <TournamentSelector class="mr-2" />
-      <template #append>
-        <v-btn variant="text" to="/">Home</v-btn>
-      </template>
-    </v-app-bar>
-
     <v-row class="mt-4">
       <v-col>
         <v-card elevation="2" rounded="lg">
           <v-card-text>
+            <v-alert v-if="frozen" type="warning" variant="tonal" class="mb-4">
+              This tournament has started — Team Match Formats are frozen and can no longer be
+              amended. The freeze anchors on the tournament's start date.
+            </v-alert>
+
             <v-select
               :model-value="selectedCategory"
               :items="categories"
               item-title="name"
               item-value="id"
-              label="Team category"
+              label="Team event"
               @update:model-value="onCategoryChange($event as string | null)"
             />
 
@@ -186,33 +247,38 @@ async function onSave() {
                   label="Cutoff lead time (min)"
                   density="compact"
                   style="max-width: 200px"
+                  :disabled="frozen"
                 />
                 <v-select
                   v-model="usageKind"
-                  :items="['at-most-once', 'max-rubbers', 'singles-plus-doubles']"
-                  label="Within-tie usage"
+                  :items="USAGE_ITEMS"
+                  item-title="title"
+                  item-value="value"
+                  label="Player usage per team match"
                   density="compact"
                   style="max-width: 260px"
+                  :disabled="frozen"
                 />
                 <v-text-field
                   v-if="usageKind === 'max-rubbers'"
                   v-model="maxRubbers"
                   type="number"
-                  label="max rubbers"
+                  label="max matches"
                   density="compact"
                   style="max-width: 140px"
+                  :disabled="frozen"
                 />
                 <template v-if="usageKind === 'singles-plus-doubles'">
-                  <v-text-field v-model="maxSingles" type="number" label="max singles" density="compact" style="max-width: 140px" />
-                  <v-text-field v-model="maxDoubles" type="number" label="max doubles" density="compact" style="max-width: 140px" />
+                  <v-text-field v-model="maxSingles" type="number" label="max singles" density="compact" style="max-width: 140px" :disabled="frozen" />
+                  <v-text-field v-model="maxDoubles" type="number" label="max doubles" density="compact" style="max-width: 140px" :disabled="frozen" />
                 </template>
               </div>
 
               <div class="d-flex align-center mt-6 mb-2">
-                <span class="text-h6">Rubbers</span>
+                <span class="text-h6">Matches</span>
                 <v-spacer />
-                <v-btn variant="tonal" size="small" prepend-icon="mdi-plus" @click="rubbers.push(newRubber())">
-                  Add rubber
+                <v-btn variant="tonal" size="small" prepend-icon="mdi-plus" :disabled="frozen" @click="rubbers.push(newRubber())">
+                  Add match
                 </v-btn>
               </div>
 
@@ -231,11 +297,12 @@ async function onSave() {
                     label="Format"
                     density="compact"
                     style="max-width: 160px"
+                    :disabled="frozen"
                   />
-                  <v-checkbox v-model="r.male" label="Men" density="compact" hide-details />
-                  <v-checkbox v-model="r.female" label="Women" density="compact" hide-details />
-                  <v-text-field v-model="r.ageMin" type="number" label="ageMin" density="compact" style="max-width: 110px" />
-                  <v-text-field v-model="r.ageMax" type="number" label="ageMax" density="compact" style="max-width: 110px" />
+                  <v-checkbox v-model="r.male" label="Men" density="compact" hide-details :disabled="frozen" />
+                  <v-checkbox v-model="r.female" label="Women" density="compact" hide-details :disabled="frozen" />
+                  <v-text-field v-model="r.ageMin" type="number" label="Min age" density="compact" style="max-width: 110px" :disabled="frozen" />
+                  <v-text-field v-model="r.ageMax" type="number" label="Max age" density="compact" style="max-width: 110px" :disabled="frozen" />
                   <v-select
                     v-if="r.format === 'doubles'"
                     v-model="r.pairRule"
@@ -243,16 +310,19 @@ async function onSave() {
                     label="Pair rule"
                     density="compact"
                     style="max-width: 180px"
+                    :disabled="frozen"
                   />
                   <v-spacer />
-                  <v-btn icon="mdi-arrow-up" variant="text" size="small" :disabled="i === 0" @click="moveRubber(i, -1)" />
-                  <v-btn icon="mdi-arrow-down" variant="text" size="small" :disabled="i === rubbers.length - 1" @click="moveRubber(i, 1)" />
-                  <v-btn icon="mdi-delete" variant="text" size="small" @click="rubbers.splice(i, 1)" />
+                  <v-btn icon="mdi-arrow-up" variant="text" size="small" :disabled="i === 0 || frozen" @click="moveRubber(i, -1)" />
+                  <v-btn icon="mdi-arrow-down" variant="text" size="small" :disabled="i === rubbers.length - 1 || frozen" @click="moveRubber(i, 1)" />
+                  <v-btn icon="mdi-delete" variant="text" size="small" :disabled="frozen" @click="rubbers.splice(i, 1)" />
                 </div>
               </v-card>
 
               <div class="mt-2">
-                <v-btn color="primary" :loading="saving" @click="onSave">Save Tie Format</v-btn>
+                <v-btn color="primary" :loading="saving || previewing" :disabled="frozen" @click="onSave">
+                  Save Team Match Format
+                </v-btn>
               </div>
               <v-alert v-if="result" :type="result.ok ? 'success' : 'error'" variant="tonal" class="mt-4">
                 {{ result.message }}
@@ -262,5 +332,37 @@ async function onSave() {
         </v-card>
       </v-col>
     </v-row>
+
+    <!-- Guarded-save confirm: impact preview + explicit confirmation -->
+    <v-dialog :model-value="confirming" max-width="560" persistent>
+      <v-card rounded="lg">
+        <v-card-item>
+          <v-card-title class="text-warning">
+            <v-icon class="mr-1">mdi-alert</v-icon> This change breaks submitted lineups
+          </v-card-title>
+        </v-card-item>
+        <v-card-text>
+          <p class="mb-3">
+            {{ breaks.length }} submitted lineup(s) no longer satisfy the proposed format:
+          </p>
+          <v-list density="compact" class="bg-grey-lighten-4 rounded">
+            <v-list-item v-for="(b, i) in breaks" :key="i">
+              <v-icon class="mr-2">mdi-sword-cross</v-icon>
+              {{ b.teamName }} vs {{ b.opponentName }} — {{ formatScheduledStart(b.scheduledStart) }}
+            </v-list-item>
+          </v-list>
+          <p class="text-caption text-medium-emphasis mt-2">
+            Each affected lineup will read <strong>Not submitted</strong> with the
+            <strong>Needs attention</strong> marker on the Matches dashboard until its manager
+            corrects and re-submits it.
+          </p>
+        </v-card-text>
+        <v-card-actions>
+          <v-spacer />
+          <v-btn variant="text" @click="onCancelConfirm">Cancel</v-btn>
+          <v-btn color="warning" :loading="saving" @click="onConfirm">Save anyway</v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
   </v-container>
 </template>

@@ -30,7 +30,7 @@ test.describe('lineup builder', () => {
 
     // Open the future tie's lineup builder directly (Bravo has two ties).
     await page.goto('/manager/tie/e2e-tie')
-    await expect(page.getByText(/Rubber 1/)).toBeVisible()
+    await expect(page.getByText(/Match 1/)).toBeVisible()
 
     // Illegal pick (Barbara, a woman, into men's singles) is refused with a reason.
     await page.locator('.v-field').filter({ hasText: 'Add player' }).first().click()

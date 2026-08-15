@@ -10,6 +10,8 @@ export interface Tournament {
   id: string
   name: string
   startDate: string | null
+  /** Date part of the tournament's last scheduled team match; null when none. */
+  lastStart: string | null
 }
 
 const LS_KEY = 'lineup.activeTournamentId'
@@ -18,6 +20,7 @@ interface TournamentRow {
   id: string
   name: string
   start_date: string | null
+  ties: { scheduled_start: string }[] | null
 }
 
 export const useTournamentStore = defineStore('tournament', () => {
@@ -38,18 +41,30 @@ export const useTournamentStore = defineStore('tournament', () => {
    * Load the tournaments visible to the caller — all of them for an admin
    * (admin RLS), just their own for a manager (manager-own-tournament policy).
    * Resolves the active id: keep the persisted choice if still valid, else the
-   * first available; clears it when there are none.
+   * first available; clears it when there are none. The nested ties select
+   * carries only each tournament's LAST scheduled team match (the selector's
+   * past-tournament rule — a start date alone can't tell running from past),
+   * bounded so history doesn't grow the payload.
    */
   async function load(): Promise<void> {
     const { data, error } = await supabase
       .from('tournaments')
-      .select('id, name, start_date')
+      // The embed must name its FK: lineups (tournament_id + tie_id) forms a
+      // second tournaments↔ties path, and a bare `ties(...)` embed is ambiguous
+      // (PGRST201 — the whole store silently fails to load). The order/limit
+      // modifiers below still key on the plain table name.
+      .select('id, name, start_date, ties!ties_tournament_id_fkey(scheduled_start)')
       .order('name')
+      // Per-embedded modifiers: only each tournament's LAST team match (desc,
+      // limit 1) travels — bounded as history grows.
+      .order('scheduled_start', { referencedTable: 'ties', ascending: false })
+      .limit(1, { referencedTable: 'ties' })
     if (error) throw error
     tournaments.value = ((data as TournamentRow[] | null) ?? []).map((r) => ({
       id: r.id,
       name: r.name,
-      startDate: r.start_date
+      startDate: r.start_date,
+      lastStart: r.ties?.[0]?.scheduled_start.slice(0, 10) ?? null
     }))
 
     const ids = new Set(tournaments.value.map((t) => t.id))

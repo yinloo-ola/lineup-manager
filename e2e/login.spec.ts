@@ -7,14 +7,15 @@ test.describe('authentication', () => {
     await expect(page).toHaveURL(/\/login$/)
   })
 
-  test('an administrator can sign in and reaches the home page', async ({ page }) => {
+  test('an administrator can sign in and lands on Matches', async ({ page }) => {
     await page.goto('/login')
     await page.getByRole('textbox', { name: /email/i }).fill(TEST_ADMIN_EMAIL)
     await page.getByRole('textbox', { name: /password/i }).fill(TEST_ADMIN_PASSWORD)
     await page.getByRole('button', { name: /sign in/i }).click()
 
-    await expect(page).toHaveURL(/\/$/)
-    // The Sign out button only renders on the authenticated home page.
+    // Setup-aware landing: the fixture's "Default" tournament exists → Matches.
+    await expect(page).toHaveURL(/\/matches$/)
+    // The Sign out button only renders in the admin shell.
     await expect(page.getByRole('button', { name: /sign out/i })).toBeVisible()
   })
 
@@ -35,7 +36,7 @@ test.describe('authentication', () => {
     await page.getByRole('textbox', { name: /email/i }).fill(TEST_ADMIN_EMAIL)
     await page.getByRole('textbox', { name: /password/i }).fill(TEST_ADMIN_PASSWORD)
     await page.getByRole('button', { name: /sign in/i }).click()
-    await expect(page).toHaveURL(/\/$/)
+    await expect(page).toHaveURL(/\/matches$/)
 
     await page.getByRole('button', { name: /sign out/i }).click()
     await expect(page).toHaveURL(/\/login$/)

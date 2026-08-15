@@ -23,7 +23,8 @@ test.describe('multi-tournament', () => {
     await page.getByRole('textbox', { name: /email/i }).fill(TEST_ADMIN_EMAIL)
     await page.getByRole('textbox', { name: /password/i }).fill(TEST_ADMIN_PASSWORD)
     await page.getByRole('button', { name: /sign in/i }).click()
-    await expect(page).toHaveURL(/\/$/)
+    // Setup-aware landing: a tournament exists → Matches.
+    await expect(page).toHaveURL(/\/matches$/)
 
     await page.goto('/admin/lineups')
     // "Default" holds the global-setup fixture (Alpha has a submitted lineup).
@@ -32,7 +33,7 @@ test.describe('multi-tournament', () => {
     // Switch to the other tournament — its lineups view re-scopes to empty.
     await page.getByLabel('Tournament').click({ force: true })
     await page.getByRole('option', { name: 'E2E Other' }).click()
-    await expect(page.getByText('No lineups saved yet.')).toBeVisible()
+    await expect(page.getByText('No team matches yet.')).toBeVisible()
     await expect(page.getByText('Alpha')).toHaveCount(0)
   })
 
