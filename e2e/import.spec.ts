@@ -68,10 +68,11 @@ test.describe('tournament import (selector dialog) → new tournament', () => {
     // The new tournament is auto-selected; its imported teams appear under
     // provisioning, each with its seeded manager email, not provisioned yet.
     await page.goto('/provision')
-    // The selector reflects the freshly created + selected tournament.
-    await expect(page.getByText(name)).toBeVisible()
-    await expect(page.getByText('Importers')).toBeVisible()
-    await expect(page.getByText('Rivals')).toBeVisible()
+    // The selector reflects the freshly created + selected tournament (the app
+    // bar repeats the name — take the first match).
+    await expect(page.getByText(name).first()).toBeVisible()
+    await expect(page.getByText('Importers', { exact: true })).toBeVisible()
+    await expect(page.getByText('Rivals', { exact: true })).toBeVisible()
     await expect(page.getByText('importers@example.test')).toBeVisible()
     await expect(page.getByText('rivals@example.test')).toBeVisible()
     await expect(page.getByText('0 of 2 team(s) provisioned.')).toBeVisible()

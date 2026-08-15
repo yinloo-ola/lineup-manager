@@ -33,7 +33,8 @@ test('admin tightens a constraint → submitted lineup invalidated → manager s
   // 2. The manager opens the affected tie and sees the invalidated signal.
   await signInManager(page, TEST_MANAGER2_EMAIL, TEST_MANAGER2_NEW_PASSWORD)
   await page.goto('/manager/tie/e2e-tie-inv')
-  await expect(page.getByText(/needs attention/i)).toBeVisible()
+  // Exact-match the status chip (the alert below it also says "Needs attention —").
+  await expect(page.getByText('Needs attention', { exact: true })).toBeVisible()
   // The lineup data is retained (Bob is still assigned) but flagged ineligible by age.
   await expect(page.locator('.v-chip', { hasText: 'Bob (M)' })).toBeVisible()
   await expect(page.getByText(/requires age min/i)).toBeVisible()

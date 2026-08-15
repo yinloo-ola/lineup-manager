@@ -97,6 +97,7 @@ async function openDelete(): Promise<void> {
   const t = active.value
   if (!t) return
   delTarget.value = { id: t.id, name: t.name }
+  deleting.value = true
   delCheckbox.value = false
   delText.value = ''
   // null = not loaded yet (or the count failed): the dialog then omits the

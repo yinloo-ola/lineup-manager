@@ -32,8 +32,11 @@ test.describe.serial('format guard + freeze (#16)', () => {
         headers: { ...headers, Prefer: 'resolution=merge-duplicates,return=minimal' },
         data: rows
       })
-    // Base format: plain men's singles; Victor (M, b. 1990) is eligible.
-    await upsert('tournaments', [{ id: TOUR_ID, name: TOUR_NAME, start_date: null }])
+    // Base format: plain men's singles; Victor (M, b. 1990) is eligible. The
+    // start date anchors age evaluation near today WITHOUT starting the
+    // tournament (that would freeze the format — the freeze test does that
+    // later; afterAll converges the value back).
+    await upsert('tournaments', [{ id: TOUR_ID, name: TOUR_NAME, start_date: '2026-09-01' }])
     await upsert('categories', [{ id: CAT_ID, tournament_id: TOUR_ID, name: CAT_NAME, short_name: 'FG' }])
     await upsert('teams', [
       { id: TEAM_A, tournament_id: TOUR_ID, name: 'Guardians' },
@@ -76,12 +79,12 @@ test.describe.serial('format guard + freeze (#16)', () => {
   })
 
   test.afterAll(async ({ request }) => {
-    // Converge the freeze test's side effect: clear the past start date so a
+    // Converge the freeze test's side effect back to the base start date so a
     // re-run starts pre-start again.
     const admin = await apiToken(request, TEST_ADMIN_EMAIL, TEST_ADMIN_PASSWORD)
     await request.patch(`${supabaseUrl}/rest/v1/tournaments?id=eq.${TOUR_ID}`, {
       headers: { ...authHeaders(admin), Prefer: 'return=minimal' },
-      data: { start_date: null }
+      data: { start_date: '2026-09-01' }
     })
   })
 
@@ -92,7 +95,8 @@ test.describe.serial('format guard + freeze (#16)', () => {
     await signInAdmin(page, TEST_ADMIN_EMAIL, TEST_ADMIN_PASSWORD)
     await activate(page)
     await page.goto('/formats')
-    await page.getByLabel('Team event').click()
+    // Vuetify's .v-field__input intercepts clicks on the select's input — click the field.
+    await page.locator('.v-field').filter({ hasText: 'Team event' }).click()
     await page.getByRole('option', { name: CAT_NAME }).click()
 
     // Tighten the format: Victor (b. 1990) is too young for min age 40.
@@ -112,7 +116,7 @@ test.describe.serial('format guard + freeze (#16)', () => {
       `${supabaseUrl}/rest/v1/tie_formats?tournament_id=eq.${TOUR_ID}&category_id=eq.${CAT_ID}&select=rubbers`,
       { headers: authHeaders(admin) }
     )
-    expect((await unchanged.json())[0]).toEqual([
+    expect((await unchanged.json())[0].rubbers).toEqual([
       { format: 'singles', constraint: { allowedGenders: ['M'] } }
     ])
 
@@ -140,7 +144,7 @@ test.describe.serial('format guard + freeze (#16)', () => {
 
     await expect(page.getByText(/Team Match Formats are frozen/i)).toBeVisible()
     // Switching is still possible; editing and saving are not.
-    await page.getByLabel('Team event').click()
+    await page.locator('.v-field').filter({ hasText: 'Team event' }).click()
     await page.getByRole('option', { name: CAT_NAME }).click()
     await expect(page.getByRole('button', { name: 'Save Team Match Format' })).toBeDisabled()
   })

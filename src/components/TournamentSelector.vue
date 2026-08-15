@@ -20,11 +20,19 @@ watch(
   }
 )
 
+// Vuetify writes the selected item's title into `search` whenever the menu
+// opens — that is its editable mirror of the selection, not the user searching.
+// Only a value that differs from the active tournament's name is a real query
+// (otherwise the list would collapse to just the active tournament).
+const query = computed(() => (search.value === store.active?.name ? '' : search.value))
+
 const today = new Date().toISOString().slice(0, 10)
 
 // Grouped per the domain rule; headers drop out when their group is empty; the
 // create entry always stays. Built-in filtering is disabled — this is the only
 // filter. Subtitles carry the start date so same-named years differ at a glance.
+// Headers are `{ type: 'subheader', title }` — a bare `{ header }` is not a
+// valid select item and renders as "[object Object]".
 const toItem = (t: { id: string; name: string; startDate: string | null }) => ({
   title: t.name,
   value: t.id,
@@ -34,15 +42,15 @@ const toItem = (t: { id: string; name: string; startDate: string | null }) => ({
 const items = computed(() => {
   const { live, past } = groupTournaments(store.tournaments, {
     today,
-    query: search.value
+    query: query.value
   })
   const out: Array<Record<string, unknown>> = []
   if (live.length) {
-    out.push({ header: 'Active & upcoming' }, ...live.map(toItem))
+    out.push({ type: 'subheader', title: 'Active & upcoming' }, ...live.map(toItem))
   }
-  if (search.value.trim()) {
+  if (query.value.trim()) {
     if (past.length) {
-      out.push({ header: 'Past' }, ...past.map(toItem))
+      out.push({ type: 'subheader', title: 'Past' }, ...past.map(toItem))
     }
   } else {
     out.push({

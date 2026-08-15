@@ -49,7 +49,11 @@ export const useTournamentStore = defineStore('tournament', () => {
   async function load(): Promise<void> {
     const { data, error } = await supabase
       .from('tournaments')
-      .select('id, name, start_date, ties(scheduled_start)')
+      // The embed must name its FK: lineups (tournament_id + tie_id) forms a
+      // second tournaments↔ties path, and a bare `ties(...)` embed is ambiguous
+      // (PGRST201 — the whole store silently fails to load). The order/limit
+      // modifiers below still key on the plain table name.
+      .select('id, name, start_date, ties!ties_tournament_id_fkey(scheduled_start)')
       .order('name')
       // Per-embedded modifiers: only each tournament's LAST team match (desc,
       // limit 1) travels — bounded as history grows.
