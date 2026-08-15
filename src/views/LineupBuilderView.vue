@@ -274,7 +274,7 @@ onMounted(load)
             <v-card elevation="1" rounded="lg">
               <v-card-item>
                 <v-card-title class="text-h6">
-                  Rubber {{ i + 1 }} <span class="text-medium-emphasis text-body-2">· {{ rubberSummary(rubber) }}</span>
+                  Match {{ i + 1 }} <span class="text-medium-emphasis text-body-2">· {{ rubberSummary(rubber) }}</span>
                 </v-card-title>
                 <v-card-subtitle>{{ expectedSlots(rubber) }} player(s)</v-card-subtitle>
               </v-card-item>

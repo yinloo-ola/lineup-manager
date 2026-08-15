@@ -33,7 +33,7 @@ test.describe('administrator dashboard + overwrite', () => {
 
     // Open the isolated post-cutoff tie as an administrator (on behalf of Bravo).
     await page.goto('/manager/tie/e2e-tie-past2?team=e2e-b')
-    await expect(page.getByText(/Rubber 1/)).toBeVisible()
+    await expect(page.getByText(/Match 1/)).toBeVisible()
     // The cutoff has passed, but the admin may still edit.
     await expect(page.getByText(/Editing as administrator/i)).toBeVisible()
 

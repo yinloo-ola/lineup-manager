@@ -50,7 +50,7 @@ export function validateLineup(
   if (lineup.playerIds.length !== tieFormat.rubbers.length) {
     violations.push({
       kind: 'malformed',
-      message: `Lineup has ${lineup.playerIds.length} rubber slot(s); the Tie Format has ${tieFormat.rubbers.length}.`
+      message: `Lineup covers ${lineup.playerIds.length} match(es); the Team Match Format defines ${tieFormat.rubbers.length}.`
     })
     return violations
   }
@@ -65,7 +65,7 @@ export function validateLineup(
     if (slots == null) {
       violations.push({
         kind: 'incomplete-rubber',
-        message: `Rubber ${rubberIndex} (${rubber.format}) is unfilled.`,
+        message: `Match ${rubberIndex + 1} (${rubber.format}) is unfilled.`,
         rubberIndex
       })
       return
@@ -73,7 +73,7 @@ export function validateLineup(
     if (slots.length > expected) {
       violations.push({
         kind: 'malformed',
-        message: `Rubber ${rubberIndex} (${rubber.format}) is over-filled with ${slots.length} players.`,
+        message: `Match ${rubberIndex + 1} (${rubber.format}) is over-filled with ${slots.length} players.`,
         rubberIndex,
         playerIds: [...slots]
       })
@@ -85,7 +85,7 @@ export function validateLineup(
       if (!p) {
         violations.push({
           kind: 'malformed',
-          message: `Player ${pid} is not on the roster (rubber ${rubberIndex}).`,
+          message: `Player ${pid} is not on the roster (match ${rubberIndex + 1}).`,
           rubberIndex,
           playerIds: [pid]
         })
@@ -97,7 +97,7 @@ export function validateLineup(
     if (slots.length < expected) {
       violations.push({
         kind: 'incomplete-rubber',
-        message: `Rubber ${rubberIndex} (${rubber.format}) is under-filled (${slots.length}/${expected}).`,
+        message: `Match ${rubberIndex + 1} (${rubber.format}) is under-filled (${slots.length}/${expected}).`,
         rubberIndex,
         playerIds: [...slots]
       })
@@ -125,7 +125,7 @@ function checkEligibility(
   if (c.allowedGenders && !c.allowedGenders.includes(p.gender)) {
     out.push({
       kind: 'ineligible-gender',
-      message: `Player ${p.id} (gender ${p.gender}) is not permitted for rubber ${rubberIndex}.`,
+      message: `Player ${p.id} (gender ${p.gender}) is not permitted for match ${rubberIndex + 1}.`,
       rubberIndex,
       playerIds: [p.id]
     })
@@ -137,7 +137,7 @@ function checkEligibility(
     if (tooYoung || tooOld) {
       out.push({
         kind: 'ineligible-age',
-        message: `Player ${p.id} is ${age} on ${asOf}; rubber ${rubberIndex} requires age min ${
+        message: `Player ${p.id} is ${age} on ${asOf}; match ${rubberIndex + 1} requires age min ${
           c.ageMin ?? 'none'
         }, max ${c.ageMax ?? 'none'}.`,
         rubberIndex,
@@ -158,7 +158,7 @@ function checkDoublesPair(
   if (aId === bId) {
     out.push({
       kind: 'malformed',
-      message: `Player ${aId} cannot be paired with themself in rubber ${rubberIndex}.`,
+      message: `Player ${aId} cannot be paired with themself in match ${rubberIndex + 1}.`,
       rubberIndex,
       playerIds: [aId]
     })
@@ -171,14 +171,14 @@ function checkDoublesPair(
   if (rule === 'same-gender' && a.gender !== b.gender) {
     out.push({
       kind: 'pair-rule',
-      message: `Rubber ${rubberIndex} (same-gender): ${aId} (${a.gender}) and ${bId} (${b.gender}) differ.`,
+      message: `Match ${rubberIndex + 1} (same-gender): ${aId} (${a.gender}) and ${bId} (${b.gender}) differ.`,
       rubberIndex,
       playerIds: [aId, bId]
     })
   } else if (rule === 'mixed' && a.gender === b.gender) {
     out.push({
       kind: 'pair-rule',
-      message: `Rubber ${rubberIndex} (mixed): ${aId} and ${bId} are both ${a.gender}.`,
+      message: `Match ${rubberIndex + 1} (mixed): ${aId} and ${bId} are both ${a.gender}.`,
       rubberIndex,
       playerIds: [aId, bId]
     })
@@ -233,7 +233,7 @@ function usageMessage(pid: string, policy: UsagePolicy, s: number, d: number, t:
     return `Player ${pid} plays ${s} singles / ${d} doubles; policy allows max ${policy.maxSingles} singles / ${policy.maxDoubles} doubles.`
   }
   const cap = policy.kind === 'max-rubbers' ? policy.max : 1
-  return `Player ${pid} plays ${t} rubbers; policy allows max ${cap}.`
+  return `Player ${pid} plays ${t} match(es); policy allows max ${cap}.`
 }
 
 /**
@@ -272,7 +272,7 @@ export function findDoubleBookings(ties: Tie[], lineups: Lineup[]): Violation[] 
       if (tieIds.length >= 2) {
         violations.push({
           kind: 'cross-slot-double-book',
-          message: `Player ${pid} is fielded in ${tieIds.length} ties sharing time slot ${slot}: ${tieIds.join(', ')}.`,
+          message: `Player ${pid} is fielded in ${tieIds.length} team matches sharing a start time (${slot}): ${tieIds.join(', ')}.`,
           playerIds: [pid],
           tieIds: [...tieIds]
         })
