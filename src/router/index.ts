@@ -10,24 +10,6 @@ const router = createRouter({
       component: () => import('@/views/LoginView.vue'),
       meta: { public: true }
     },
-    // PROTOTYPE (throwaway, wayfinder tickets 06/07) — admin-shell and
-    // Matches-dashboard variants; dev only, mock data, never committed.
-    ...(import.meta.env.DEV
-      ? [
-          {
-            path: '/prototype/shell',
-            name: 'prototype-shell',
-            component: () => import('@/views/PrototypeShellView.vue'),
-            meta: { public: true }
-          },
-          {
-            path: '/prototype/matches',
-            name: 'prototype-matches',
-            component: () => import('@/views/PrototypeMatchesView.vue'),
-            meta: { public: true }
-          }
-        ]
-      : []),
     {
       path: '/',
       name: 'home',
