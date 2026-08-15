@@ -5,7 +5,7 @@ import { renameError } from '../tournamentManage'
 // seam is the rename validation — the same case-folded uniqueness the import path
 // enforces (seed a second "spring" vs "Spring" is confusing), plus the empty
 // guard. `otherNames` is the names of every OTHER tournament (the one being
-// renamed is excluded by the caller), matching the prototype's renError rule.
+// renamed is excluded by the caller).
 
 describe('renameError', () => {
   it('accepts a fresh, non-empty name', () => {
