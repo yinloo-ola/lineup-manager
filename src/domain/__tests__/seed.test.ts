@@ -26,6 +26,9 @@ const validSeed = {
   ]
 }
 
+/** A deep copy of the valid seed, for tests that mutate one field at a time. */
+const base = () => JSON.parse(JSON.stringify(validSeed))
+
 describe('parseSeed — happy path', () => {
   it('parses a well-formed seed into the typed shape', () => {
     expect(parseSeed(validSeed)).toEqual(validSeed)
@@ -60,12 +63,11 @@ describe('parseSeed — happy path', () => {
 })
 
 describe('parseSeed — seedVersion gate', () => {
-  const base = () => JSON.parse(JSON.stringify(validSeed))
 
-  it('rejects a seed without seedVersion (pre-v1 export)', () => {
+  it('rejects a seed without seedVersion (pre-v1 export) with a re-export hint', () => {
     const s = base()
     delete s.seedVersion
-    expect(() => parseSeed(s)).toThrow(/seedVersion.*pre-v1|pre-v1.*seedVersion|seedVersion/)
+    expect(() => parseSeed(s)).toThrow(/pre-v1.*organizer tool/)
   })
 
   it('rejects an unknown version with the supported one named', () => {
@@ -82,7 +84,6 @@ describe('parseSeed — seedVersion gate', () => {
 })
 
 describe('parseSeed — managerEmail (one manager per team)', () => {
-  const base = () => JSON.parse(JSON.stringify(validSeed))
 
   it('rejects a missing managerEmail, naming the team', () => {
     const s = base()
@@ -104,7 +105,6 @@ describe('parseSeed — managerEmail (one manager per team)', () => {
 })
 
 describe('parseSeed — startDate', () => {
-  const base = () => JSON.parse(JSON.stringify(validSeed))
 
   it('rejects a startDate that is not a real calendar date', () => {
     const s = base()
@@ -142,7 +142,6 @@ describe('resolveStartDate — the seed-or-earliest-tie rule (spec §8)', () => 
 })
 
 describe('parseSeed — rejects malformed input', () => {
-  const base = () => JSON.parse(JSON.stringify(validSeed))
 
   it('rejects non-object input', () => {
     expect(() => parseSeed('nope')).toThrow(SeedParseError)
@@ -223,7 +222,6 @@ describe('parseSeed — rejects malformed input', () => {
 })
 
 describe('parseSeed — dateOfBirth formats', () => {
-  const base = () => JSON.parse(JSON.stringify(validSeed))
 
   it('normalizes an Excel-serial dateOfBirth (tournament-manager export) to yyyy-mm-dd', () => {
     const s = base()

@@ -5,6 +5,7 @@ The **seed** is the one-time JSON export from the organizer tool (`tournament-ma
 - **Versioning:** every seed carries `seedVersion`. This app supports **version 1**; an unknown or missing version is rejected at parse time with a clear message. Evolution of the contract bumps the version — never edits v1 silently.
 - **On screen:** the word "seed" never appears to users — the action is "Import tournament". "Seed" is this internal contract's term.
 - **Producer:** `/home/user/code/personal/tournament-manager` (local sibling repo). Follow-ups decided alongside this contract, enacted over there: manager-email capture in the entry flow, and `startDate`/`group`/`round` export.
+- **Schema ↔ parser, two deliberate gaps:** the schema sets `additionalProperties: false` (the producer's stricter guarantee — the parser ignores unknown fields rather than rejecting), and the schema's `startDate` pattern can only check the shape — the parser additionally rejects impossible calendar dates (e.g. `2026-02-30`). Everything else is exact lockstep; when changing one of the three artifacts, change all three.
 
 ## Shape (v1)
 

@@ -67,6 +67,9 @@ export interface Tie {
   /** ISO date-time, tournament-local, of the scheduled start. */
   scheduledStart: string
   table?: string
+  /** Human-label group/round from the seed, where the schedule has them. */
+  group?: string
+  round?: string
   teamIds: [string, string]
 }
 

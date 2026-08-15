@@ -51,7 +51,7 @@ test.describe('seed import → new tournament', () => {
     await signInAdmin(page)
     await page.goto('/import')
 
-    await page.getByLabel('Seed JSON').fill(seedJson(name))
+    await page.getByLabel('Tournament JSON').fill(seedJson(name))
     await page.getByRole('button', { name: /parse & import/i }).click()
     await expect(page.getByText(/created —/)).toBeVisible()
 
@@ -72,7 +72,7 @@ test.describe('seed import → new tournament', () => {
     await page.goto('/import')
 
     // "Default" is created by the e2e fixture setup, so this name always clashes.
-    await page.getByLabel('Seed JSON').fill(seedJson('Default'))
+    await page.getByLabel('Tournament JSON').fill(seedJson('Default'))
     await page.getByRole('button', { name: /parse & import/i }).click()
 
     // The clash surfaces with the existing name and a rename field; Confirm is
@@ -101,12 +101,12 @@ test.describe('seed import → new tournament', () => {
     await page.goto('/import')
 
     // First import: straight through.
-    await page.getByLabel('Seed JSON').fill(seedJson(first))
+    await page.getByLabel('Tournament JSON').fill(seedJson(first))
     await page.getByRole('button', { name: /parse & import/i }).click()
     await expect(page.getByText(/created —/)).toBeVisible()
 
     // Same seed again: the name now clashes, and renaming completes the import.
-    await page.getByLabel('Seed JSON').fill(seedJson(first))
+    await page.getByLabel('Tournament JSON').fill(seedJson(first))
     await page.getByRole('button', { name: /parse & import/i }).click()
     await expect(page.getByText(/already exists/i)).toBeVisible()
     await page.getByLabel('New tournament name').fill(second)

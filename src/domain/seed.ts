@@ -67,6 +67,11 @@ export interface SeedFile {
  */
 export function parseSeed(input: unknown): SeedFile {
   const root = object(input, 'seed')
+  if (root.seedVersion === undefined) {
+    throw new ParseError(
+      'seedVersion is missing — this looks like a pre-v1 seed. Re-export it from the organizer tool.'
+    )
+  }
   const seedVersion = nonNegInt(root.seedVersion, 'seedVersion')
   if (seedVersion !== SUPPORTED_SEED_VERSION) {
     throw new ParseError(
@@ -153,21 +158,22 @@ function parseCategory(input: unknown, index: number): SeedCategory {
 
 function parseTeam(input: unknown, index: number): SeedTeam {
   const o = object(input, `teams[${index}]`)
-  const team: SeedTeam = {
-    id: string(o.id, `teams[${index}].id`),
-    name: string(o.name, `teams[${index}].name`),
-    managerEmail: ''
-  }
+  const name = string(o.name, `teams[${index}].name`)
   if (o.managerEmail === undefined) {
     throw new ParseError(
-      `teams[${index}] ("${team.name}"): managerEmail is missing — every team must carry its manager's email.`
+      `teams[${index}] ("${name}"): managerEmail is missing — every team must carry its manager's email.`
     )
   }
-  team.managerEmail = string(o.managerEmail, `teams[${index}].managerEmail`)
-  if (!EMAIL_SHAPE.test(team.managerEmail)) {
+  const managerEmail = string(o.managerEmail, `teams[${index}].managerEmail`)
+  if (!EMAIL_SHAPE.test(managerEmail)) {
     throw new ParseError(
-      `teams[${index}] ("${team.name}"): managerEmail "${team.managerEmail}" is not a valid email.`
+      `teams[${index}] ("${name}"): managerEmail "${managerEmail}" is not a valid email.`
     )
+  }
+  const team: SeedTeam = {
+    id: string(o.id, `teams[${index}].id`),
+    name,
+    managerEmail
   }
   if (o.club !== undefined) team.club = string(o.club, `teams[${index}].club`)
   return team

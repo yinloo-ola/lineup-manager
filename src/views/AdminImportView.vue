@@ -30,7 +30,7 @@ function onFile(e: Event) {
 
 /** Surface parse/network errors with a clear message (parse errors are framed). */
 function messageFor(e: unknown): string {
-  return e instanceof SeedParseError ? `Invalid seed: ${e.message}` : (e as Error).message
+  return e instanceof SeedParseError ? `Invalid tournament file: ${e.message}` : (e as Error).message
 }
 
 /** Run an async action under the busy flag, surfacing any error as a result. */
@@ -89,7 +89,7 @@ function cancelRename() {
 <template>
   <v-container>
     <v-app-bar flat color="surface">
-      <v-app-bar-title>Import seed</v-app-bar-title>
+      <v-app-bar-title>Import tournament</v-app-bar-title>
       <template #append>
         <v-btn variant="text" to="/">Home</v-btn>
       </template>
@@ -104,8 +104,7 @@ function cancelRename() {
               <code>.json</code> file). Each import creates a <strong>new tournament</strong> named
               from <code>tournamentName</code> — re-importing the same file makes a second
               tournament, it never overwrites. Every team carries its manager's email, so
-              provisioning is pre-filled after import. Contract:
-              <code>docs/seed-contract.md</code>.
+              provisioning is pre-filled after import.
             </p>
             <v-textarea
               v-model="jsonText"

@@ -26,6 +26,8 @@ interface TieRow {
   category_id: string
   scheduled_start: string
   table_label: string | null
+  group_label: string | null
+  round_label: string | null
   team_a: string
   team_b: string
   tournament_id: string
@@ -110,7 +112,9 @@ export async function fetchLineupBuilderData(
   // opponent names or cross-slot clash detection.
   const tieRes = await client
     .from('ties')
-    .select('id, category_id, scheduled_start, table_label, team_a, team_b, tournament_id')
+    .select(
+      'id, category_id, scheduled_start, table_label, group_label, round_label, team_a, team_b, tournament_id'
+    )
     .eq('id', tieId)
     .maybeSingle()
   check(tieRes.error)
@@ -135,7 +139,7 @@ export async function fetchLineupBuilderData(
       .maybeSingle(),
     client
       .from('ties')
-      .select('id, category_id, scheduled_start, table_label, team_a, team_b')
+      .select('id, category_id, scheduled_start, table_label, group_label, round_label, team_a, team_b')
       .eq('tournament_id', tieRow.tournament_id)
       .or(`team_a.eq.${teamId},team_b.eq.${teamId}`),
     client
@@ -173,6 +177,8 @@ export async function fetchLineupBuilderData(
     id: tieRow.id,
     scheduledStart: tieRow.scheduled_start,
     table: tieRow.table_label ?? undefined,
+    group: tieRow.group_label ?? undefined,
+    round: tieRow.round_label ?? undefined,
     teamIds: [tieRow.team_a, tieRow.team_b]
   }
   const teamTies: Tie[] = (allTiesRes.data as TieRow[] | null ?? [])
@@ -181,6 +187,8 @@ export async function fetchLineupBuilderData(
       id: t.id,
       scheduledStart: t.scheduled_start,
       table: t.table_label ?? undefined,
+      group: t.group_label ?? undefined,
+      round: t.round_label ?? undefined,
       teamIds: [t.team_a, t.team_b]
     }))
   const teamLineups: Lineup[] = (allLineupsRes.data as LineupRow[] | null ?? [])
