@@ -41,7 +41,7 @@ One team's player assignments to the matches of one team match.
 _Avoid_: submission, roster, selection
 
 **Lineup Status**:
-Where a team's lineup stands for one team match: **Submitted** or **Not submitted** — with a **Needs attention** marker in the rare case a pre-start format change broke a submitted lineup. **Locked** is not a status: it marks a team match past its cutoff.
+Where a team's lineup stands for one team match: **Submitted** or **Not submitted** — with a **Needs attention** marker in the rare case a pre-start format change broke a submitted lineup. **Locked** is not a status: it marks a team match past its cutoff. A lineup still missing once the cutoff has passed is flagged **Missed cutoff** — the urgent, actionable case (chase the manager, or the admin fills the lineup on the team's behalf).
 _Avoid_: invalidated, not-started and draft outside the lineup builder, complete/incomplete (reserved for match results)
 
 **Team Manager**:
