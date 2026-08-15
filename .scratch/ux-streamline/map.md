@@ -20,11 +20,11 @@ A decision-complete UX spec for the **administrator console**: every open experi
 - [External UX patterns for deadline-driven lineup submission](issues/04-external-lineup-ux-patterns.md) — fixture-anchored IA with status chips, draft→explicit-submit→locked state, escalating deadline ladder + admin nudge view, submit-time validation that names the broken rule, and guarded format changes (NFL add-not-remove precedent); assume phone-at-venue submission.
 - [Admin console walkthrough](issues/03-admin-console-walkthrough.md) — oversight is the heartbeat; lean submitted/not-submitted dashboard by team match (sorted scheduled time → table number, completed/cutoff filters); phase-based nav grouping setup vs oversight with location awareness; setup-aware landing; visibility-only chasing; format authoring and import/manage/provision are fine as-is.
 - [Settle the user-facing status vocabulary](issues/05-user-facing-status-vocabulary.md) — binary Submitted/Not submitted outside the builder, rare Needs-attention marker, Locked chip stays, "completed" reserved for a future results feature; formats freeze at tournament start with guarded (impact-preview + confirm) pre-start edits. Glossary updated in `CONTEXT.md`.
+- [Prototype the admin shell and phase-based navigation](issues/06-admin-shell-navigation-prototype.md) — the shell is variant A: flat left rail, **Matches** primary, the three setup sections (Tournament settings / Team match formats / Provision managers) directly in the rail but visually subordinate, no collapsing; setup-aware landing; searchable grouped (Active & upcoming / Past) tournament selector owning switching **and** creation ("Import tournament…" — never "Import seed" on screen); format freeze shown as a rail lock icon.
 
 ## Not yet specified
 
-- Seed contract with the organizer tool — the seed JSON must carry group/round per team match (walkthrough), and a team-manager email per team (user, during shell prototyping: import-is-create, then formats + provisioning with emails pre-filled from the seed). Sharpens into a spec section once the shell decision lands.
-- Cross-app consistency — whether the console's patterns must stay consistent with the separate `tournament-manager` repo. Hangs on the admin walkthrough.
+- Cross-app consistency — whether the console's patterns must stay consistent with the separate `tournament-manager` repo. Hangs on the remaining view decisions (the dashboard) and the seed contract.
 
 ## Out of scope
 

@@ -16,4 +16,5 @@ What do the oversight dashboard and the grouped all-lineups view concretely look
 - **Metadata**: show `table_label` (exists today); show group and round **where available** — the data model lacks them, so state the metadata requirement (seed-sourced group/round) as part of the design rather than designing around their absence.
 - **Chasing is visibility-only** — the indicator is the whole story; no nudge controls.
 - Status chips/labels use the vocabulary settled by [Settle the user-facing status vocabulary](05-user-facing-status-vocabulary.md), inside the shell framed by [Prototype the admin shell and phase-based navigation](06-admin-shell-navigation-prototype.md).
+- On-screen naming per the shell decision: the nav area is **Matches** (the word "oversight" stays internal to the spec, not on screen).
 - Consult the [ux-designer skill](https://github.com/szilu/ux-designer-skill) data-table references for the table/list design lens.
