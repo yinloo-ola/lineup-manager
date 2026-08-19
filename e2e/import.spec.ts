@@ -24,10 +24,10 @@ async function openImportDialog(page: import('@playwright/test').Page): Promise<
   await expect(page.getByRole('dialog')).toBeVisible()
 }
 
-/** A minimal valid v1 seed whose ids are stable (the import remints them anyway). */
+/** A minimal valid v2 seed whose ids are stable (the import remints them anyway). */
 function seedJson(tournamentName: string): string {
   return JSON.stringify({
-    seedVersion: 1,
+    seedVersion: 2,
     tournamentName,
     categories: [{ id: 'imp-cat', name: "Men's Team", shortName: 'MT' }],
     teams: [
@@ -128,6 +128,87 @@ test.describe('tournament import (selector dialog) → new tournament', () => {
     await expect(confirm).toBeEnabled()
     await confirm.click()
     await expect(page.getByText(/created —/)).toBeVisible()
+  })
+
+  test('a v1 seed is rejected at the version gate with a re-export hint', async ({ page }) => {
+    await signInAdmin(page)
+    await openImportDialog(page)
+
+    const v1 = JSON.parse(seedJson('E2E Old Seed'))
+    v1.seedVersion = 1
+    await page.getByLabel('Tournament JSON').fill(JSON.stringify(v1))
+    await page.getByRole('button', { name: /parse & import/i }).click()
+
+    await expect(page.getByText(/Unsupported seed version 1.*version 2/i)).toBeVisible()
+    // Nothing was created.
+    await expect(page.getByText(/created —/)).toHaveCount(0)
+  })
+
+  test('a v2 seed with a knockout bracket imports and its bracket view renders', async ({ page, request }) => {
+    const name = `E2E KO Import ${Date.now()}`
+    await signInAdmin(page)
+    await openImportDialog(page)
+
+    // The ko-import worked example: 6 qualifiers, draw of 8 — entry-round pool,
+    // fed later rounds, bracket structure.
+    const seed = {
+      seedVersion: 2,
+      tournamentName: name,
+      startDate: '2098-01-01',
+      categories: [{ id: 'KO', name: "Men's Team", shortName: 'KO' }],
+      teams: [
+        { id: 'KO|Kilo', name: 'Kilo', managerEmail: `kilo-${Date.now()}@example.test` },
+        { id: 'KO|Lima', name: 'Lima', managerEmail: `lima-${Date.now()}@example.test` },
+        { id: 'KO|Mike', name: 'Mike', managerEmail: `mike-${Date.now()}@example.test` },
+        { id: 'KO|November', name: 'November', managerEmail: `november-${Date.now()}@example.test` },
+        { id: 'KO|Oscar', name: 'Oscar', managerEmail: `oscar-${Date.now()}@example.test` },
+        { id: 'KO|Papa', name: 'Papa', managerEmail: `papa-${Date.now()}@example.test` }
+      ],
+      players: [
+        { id: 'KO|Kilo|k1', teamId: 'KO|Kilo', name: 'k1', gender: 'M', dateOfBirth: '1990-01-01' }
+      ],
+      ties: [
+        { id: 'KO|g1', categoryId: 'KO', scheduledStart: '2098-01-01T10:00', group: 'A', round: '1', teamIds: ['KO|Kilo', 'KO|Lima'] },
+        { id: 'KO|ko|QF|T2|2098-01-02T14:00', categoryId: 'KO', scheduledStart: '2098-01-02T14:00', table: 'T2', round: 'QF' },
+        { id: 'KO|ko|QF|T3|2098-01-02T14:00', categoryId: 'KO', scheduledStart: '2098-01-02T14:00', table: 'T3', round: 'QF' },
+        { id: 'KO|ko|SF|1', categoryId: 'KO', scheduledStart: '2098-01-02T16:00', table: 'T2', round: 'SF', fedBy: ['KO|ko|QF|1', 'KO|ko|QF|2'] },
+        { id: 'KO|ko|SF|2', categoryId: 'KO', scheduledStart: '2098-01-02T16:00', table: 'T3', round: 'SF', fedBy: ['KO|ko|QF|3', 'KO|ko|QF|4'] },
+        { id: 'KO|ko|F|1', categoryId: 'KO', scheduledStart: '2098-01-02T18:00', table: 'T1', round: 'F', fedBy: ['KO|ko|SF|1', 'KO|ko|SF|2'] }
+      ],
+      brackets: [
+        {
+          categoryId: 'KO',
+          rounds: [
+            { label: 'QF', slots: 4 },
+            { label: 'SF', slots: 2, fedBy: [['KO|ko|QF|1', 'KO|ko|QF|2'], ['KO|ko|QF|3', 'KO|ko|QF|4']] },
+            { label: 'F', slots: 1, fedBy: [['KO|ko|SF|1', 'KO|ko|SF|2']] }
+          ]
+        }
+      ]
+    }
+    await page.getByLabel('Tournament JSON').fill(JSON.stringify(seed))
+    await page.getByRole('button', { name: /parse & import/i }).click()
+    await expect(page.getByText(/created —/)).toBeVisible()
+
+    // The bracket view renders the imported structure: rounds, pool chips, slots.
+    await page.goto('/bracket')
+    await expect(page.getByText('QF').first()).toBeVisible()
+    await expect(page.getByText(/Imported QF team matches/)).toBeVisible()
+    await expect(page.getByText('T2 · 2098-01-02 14:00', { exact: false })).toBeVisible()
+
+    // Cleanup (no managers provisioned): plain REST cascade delete.
+    const admin = await apiToken(request, TEST_ADMIN_EMAIL, TEST_ADMIN_PASSWORD)
+    const tourRes = await request.get(
+      `${supabaseUrl}/rest/v1/tournaments?name=eq.${encodeURIComponent(name)}&select=id`,
+      { headers: authHeaders(admin) }
+    )
+    const [mine] = (await tourRes.json()) as { id: string }[]
+    if (mine) {
+      const del = await request.delete(`${supabaseUrl}/rest/v1/tournaments?id=eq.${mine.id}`, {
+        headers: authHeaders(admin)
+      })
+      expect(del.ok()).toBeTruthy()
+    }
   })
 
   test('re-importing the same seed creates a second, independent tournament', async ({

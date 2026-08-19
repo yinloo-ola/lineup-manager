@@ -8,18 +8,18 @@ const NAMES = new Map([
 ])
 
 function rows(): BracketTieRow[] {
-  const blank = (id: string): BracketTieRow => ({ id, categoryId: 'MT', scheduledStart: null, tableLabel: null, roundLabel: null, groupLabel: null, teamA: null, teamB: null, fedByA: null, fedByB: null, winnerSide: null, placedMatchId: null, isKnockout: false })
-  const slot = (id: string, label: string, extra: Partial<BracketTieRow> = {}): BracketTieRow => ({ ...blank(id), isKnockout: true, roundLabel: label, ...extra })
+  const blank = (id: string): BracketTieRow => ({ id, categoryId: 'MT', scheduledStart: null, tableLabel: null, roundLabel: null, groupLabel: null, teamA: null, teamB: null, fedByA: null, fedByB: null, winnerSide: null, placedMatchId: null, isKnockout: false, bracketSlot: null, })
+  const slot = (id: string, label: string, n: number | null, extra: Partial<BracketTieRow> = {}): BracketTieRow => ({ ...blank(id), isKnockout: true, roundLabel: label, bracketSlot: n, ...extra })
   return [
     { ...blank('g1'), teamA: 'tA', teamB: 'tB' },
     { ...blank('g2'), teamA: 'tC', teamB: 'tD' },
     { ...blank('g3'), teamA: 'tE', teamB: 'tF' },
-    slot('qf1', 'QF'), slot('qf2', 'QF'), slot('qf3', 'QF'), slot('qf4', 'QF'),
+    slot('qf1', 'QF', 1), slot('qf2', 'QF', 2), slot('qf3', 'QF', 3), slot('qf4', 'QF', 4),
     { ...blank('p1'), isKnockout: true, roundLabel: 'QF', scheduledStart: '2026-09-13T14:00', tableLabel: 'T2' },
     { ...blank('p2'), isKnockout: true, roundLabel: 'QF', scheduledStart: '2026-09-13T14:00', tableLabel: 'T3' },
-    slot('sf1', 'SF', { scheduledStart: '2026-09-13T16:00', tableLabel: 'T2', fedByA: 'qf1', fedByB: 'qf2' }),
-    slot('sf2', 'SF', { scheduledStart: '2026-09-13T16:00', tableLabel: 'T3', fedByA: 'qf3', fedByB: 'qf4' }),
-    slot('f1', 'F', { scheduledStart: '2026-09-13T18:00', tableLabel: 'T1', fedByA: 'sf1', fedByB: 'sf2' })
+    slot('sf1', 'SF', 1, { scheduledStart: '2026-09-13T16:00', tableLabel: 'T2', fedByA: 'qf1', fedByB: 'qf2' }),
+    slot('sf2', 'SF', 2, { scheduledStart: '2026-09-13T16:00', tableLabel: 'T3', fedByA: 'qf3', fedByB: 'qf4' }),
+    slot('f1', 'F', 1, { scheduledStart: '2026-09-13T18:00', tableLabel: 'T1', fedByA: 'sf1', fedByB: 'sf2' })
   ]
 }
 

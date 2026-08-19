@@ -44,6 +44,8 @@ export interface TablePayloads {
     winner_side: null
     is_knockout: boolean
     placed_match_id: string | null
+    /** 1-based slot number within its round (entry + fed slots); null elsewhere. */
+    bracket_slot: number | null
   }[]
 }
 
@@ -134,12 +136,16 @@ export function toTablePayloads(
         team_b: freshId(t.teamIds[1]),
         fed_by_a: null,
         fed_by_b: null,
-        is_knockout: false
+        is_knockout: false,
+        bracket_slot: null
       })
     } else {
       // Knockout tie — pool (no fedBy: table + time, no position, no teams —
-      // the admin places it in the bracket view) or fed later round.
+      // the admin places it in the bracket view) or fed later round. A fed
+      // tie's SEED id is its positional slot id, so its slot number survives
+      // the id minting.
       const feeds = 'fedBy' in t ? t.fedBy : null
+      const slotFromId = Number(t.id.split('|').pop())
       tieRows.push({
         ...base,
         id: freshId(t.id),
@@ -150,7 +156,8 @@ export function toTablePayloads(
         team_b: null,
         fed_by_a: feeds ? freshId(feeds[0]) : null,
         fed_by_b: feeds ? freshId(feeds[1]) : null,
-        is_knockout: true
+        is_knockout: true,
+        bracket_slot: feeds && Number.isInteger(slotFromId) ? slotFromId : null
       })
     }
   }
@@ -182,7 +189,8 @@ export function toTablePayloads(
           fed_by_b: feeds ? freshId(feeds[1]) : null,
           winner_side: null,
           is_knockout: true,
-          placed_match_id: null
+          placed_match_id: null,
+          bracket_slot: n
         })
       }
     }

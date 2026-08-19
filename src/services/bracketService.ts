@@ -45,6 +45,7 @@ interface TieDbRow {
   winner_side: 'a' | 'b' | null
   placed_match_id: string | null
   is_knockout: boolean
+  bracket_slot: number | null
 }
 interface LineupDbRow {
   tie_id: string
@@ -75,7 +76,7 @@ export async function fetchBracket(
     client
       .from('ties')
       .select(
-        'id, category_id, scheduled_start, table_label, group_label, round_label, team_a, team_b, fed_by_a, fed_by_b, winner_side, placed_match_id, is_knockout'
+        'id, category_id, scheduled_start, table_label, group_label, round_label, team_a, team_b, fed_by_a, fed_by_b, winner_side, placed_match_id, is_knockout, bracket_slot'
       )
       .eq('tournament_id', tournamentId)
       .eq('category_id', categoryId),
@@ -99,7 +100,8 @@ export async function fetchBracket(
     fedByB: t.fed_by_b,
     winnerSide: t.winner_side,
     placedMatchId: t.placed_match_id,
-    isKnockout: t.is_knockout
+    isKnockout: t.is_knockout,
+    bracketSlot: t.bracket_slot
   }))
   const lineups = ((lineupsRes.data as LineupDbRow[] | null) ?? []).map((l) => ({
     tieId: l.tie_id,

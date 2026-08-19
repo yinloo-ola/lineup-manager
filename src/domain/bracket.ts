@@ -21,6 +21,8 @@ export interface BracketTieRow {
   winnerSide: 'a' | 'b' | null
   placedMatchId: string | null
   isKnockout: boolean
+  /** 1-based position within the round (slot rows); null for pool/group. */
+  bracketSlot: number | null
 }
 
 /** A lineup reference for guard/cascade decisions (status kept for context). */
@@ -120,11 +122,17 @@ export function buildBracketSnapshot(
     if (r.placedMatchId !== null) placedByPool.set(r.placedMatchId, r.id)
   }
 
+  // Deterministic bracket order: round rank (R256 first … F last), then slot
+  // position — without this the DB's unordered select shuffles a round's
+  // slots and the feeds cross.
   const slotViews: BracketSlotView[] = slotEntries
     .sort((a, b) => {
       const ra = a.r.roundLabel ? ROUND_RANK[a.r.roundLabel] ?? 99 : 99
       const rb = b.r.roundLabel ? ROUND_RANK[b.r.roundLabel] ?? 99 : 99
-      return ra !== rb ? ra - rb : a.i - b.i
+      if (ra !== rb) return ra - rb
+      const sa = a.r.bracketSlot ?? 999
+      const sb = b.r.bracketSlot ?? 999
+      return sa !== sb ? sa - sb : a.i - b.i
     })
     .map(({ r }) => {
       const teams = resolveTeams(r)

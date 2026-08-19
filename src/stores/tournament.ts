@@ -64,7 +64,9 @@ export const useTournamentStore = defineStore('tournament', () => {
       id: r.id,
       name: r.name,
       startDate: r.start_date,
-      lastStart: r.ties?.[0]?.scheduled_start.slice(0, 10) ?? null
+      // Null-safe: unscheduled KO slots (null scheduled_start) can be the
+      // embedded row — Postgres orders NULLs first under DESC.
+      lastStart: r.ties?.[0]?.scheduled_start?.slice(0, 10) ?? null
     }))
 
     const ids = new Set(tournaments.value.map((t) => t.id))

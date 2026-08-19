@@ -129,7 +129,8 @@ describe('toTablePayloads', () => {
       fed_by_b: null,
       winner_side: null,
       is_knockout: false,
-      placed_match_id: null
+      placed_match_id: null,
+      bracket_slot: null
     })
   })
 

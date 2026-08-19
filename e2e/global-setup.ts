@@ -24,6 +24,12 @@ export const TEST_MANAGER2_EMAIL = 'manager2@lineup.local'
 export const TEST_MANAGER2_PASSWORD = 'manager2-password-123'
 export const TEST_MANAGER2_NEW_PASSWORD = 'manager2-new-pw-123'
 
+// A third manager on KO team e2e-ka, for the knockout RLS spec (null-side
+// invisibility, visibility on landing, and the tightened lineup membership).
+export const TEST_MANAGER3_EMAIL = 'manager3@lineup.local'
+export const TEST_MANAGER3_PASSWORD = 'manager3-password-123'
+export const TEST_MANAGER3_NEW_PASSWORD = 'manager3-new-pw-123'
+
 function jsonHeaders(token?: string): Record<string, string> {
   const h: Record<string, string> = {
     'Content-Type': 'application/json',
@@ -87,13 +93,25 @@ export default async function globalSetup(): Promise<void> {
     { id: 'e2e-cat', tournament_id: DEFAULT_TOUR, name: "E2E Men's Team", short_name: 'EMT' },
     // Isolated category for the Ticket 9 invalidation e2e (its own format/tie so
     // tightening it cannot affect the other specs' lineups in e2e-cat).
-    { id: 'e2e-cat-inv', tournament_id: DEFAULT_TOUR, name: 'E2E Invalidation', short_name: 'EI' }
+    { id: 'e2e-cat-inv', tournament_id: DEFAULT_TOUR, name: 'E2E Invalidation', short_name: 'EI' },
+    // Isolated knockout categories (ko-import #15): one owned by the bracket
+    // UI lifecycle spec, one by the RLS spec — never shared, so parallel specs
+    // never race on the same rows.
+    { id: 'e2e-cat-ko', tournament_id: DEFAULT_TOUR, name: 'E2E Knockout', short_name: 'EK' },
+    { id: 'e2e-cat-ko-rls', tournament_id: DEFAULT_TOUR, name: 'E2E Knockout RLS', short_name: 'EKR' }
   ])
   await restUpsert(adminToken, 'teams', [
     { id: 'e2e-a', tournament_id: DEFAULT_TOUR, name: 'Alpha' },
     { id: 'e2e-b', tournament_id: DEFAULT_TOUR, name: 'Bravo' },
     // Opponent for Bravo's past-cutoff tie (Ticket 7 server-side enforcement test).
-    { id: 'e2e-c', tournament_id: DEFAULT_TOUR, name: 'Charlie' }
+    { id: 'e2e-c', tournament_id: DEFAULT_TOUR, name: 'Charlie' },
+    // Knockout fixture teams (6 qualifiers, draw of 8 — the spec's worked example).
+    { id: 'e2e-ka', tournament_id: DEFAULT_TOUR, name: 'Kilo' },
+    { id: 'e2e-kb', tournament_id: DEFAULT_TOUR, name: 'Lima' },
+    { id: 'e2e-kc', tournament_id: DEFAULT_TOUR, name: 'Mike' },
+    { id: 'e2e-kd', tournament_id: DEFAULT_TOUR, name: 'November' },
+    { id: 'e2e-ke', tournament_id: DEFAULT_TOUR, name: 'Oscar' },
+    { id: 'e2e-kf', tournament_id: DEFAULT_TOUR, name: 'Papa' }
   ])
   await restUpsert(adminToken, 'players', [
     { id: 'e2e-p1', tournament_id: DEFAULT_TOUR, team_id: 'e2e-a', name: 'Alice', gender: 'F', date_of_birth: '1990-01-01' },
@@ -188,6 +206,37 @@ export default async function globalSetup(): Promise<void> {
     }
   ])
 
+  // Knockout brackets (ko-import #15). Group ties put the six teams in the
+  // knockout categories (team entry derives its options from group membership);
+  // then each category's draw of 8: four entry slots (unscheduled, empty), two
+  // pool matches (scheduled, unplaced), and fed SF/F rows. The lifecycle spec
+  // RESETS its rows to this pristine shape before each run (it mutates them);
+  // the RLS category's rows are only ever PATCHed onto e2e-ka and re-converged
+  // here by the same upserts.
+  await restUpsert(adminToken, 'ties', [
+    // PostgREST batches need uniform keys — every row below carries the full
+    // tie column set (explicit nulls) so one POST covers groups + slots + pool.
+    { id: 'e2e-ko-g1', tournament_id: DEFAULT_TOUR, category_id: 'e2e-cat-ko', scheduled_start: '2098-01-01T10:00:00+00:00', table_label: null, group_label: 'A', round_label: 'Round 1', team_a: 'e2e-ka', team_b: 'e2e-kb', fed_by_a: null, fed_by_b: null, winner_side: null, placed_match_id: null, is_knockout: false, bracket_slot: null },
+    { id: 'e2e-ko-g2', tournament_id: DEFAULT_TOUR, category_id: 'e2e-cat-ko', scheduled_start: '2098-01-01T11:00:00+00:00', table_label: null, group_label: 'B', round_label: 'Round 1', team_a: 'e2e-kc', team_b: 'e2e-kd', fed_by_a: null, fed_by_b: null, winner_side: null, placed_match_id: null, is_knockout: false, bracket_slot: null },
+    { id: 'e2e-ko-g3', tournament_id: DEFAULT_TOUR, category_id: 'e2e-cat-ko', scheduled_start: '2098-01-01T12:00:00+00:00', table_label: null, group_label: 'C', round_label: 'Round 1', team_a: 'e2e-ke', team_b: 'e2e-kf', fed_by_a: null, fed_by_b: null, winner_side: null, placed_match_id: null, is_knockout: false, bracket_slot: null },
+    { id: 'e2e-ko-qf1', tournament_id: DEFAULT_TOUR, category_id: 'e2e-cat-ko', scheduled_start: null, table_label: null, group_label: null, round_label: 'QF', team_a: null, team_b: null, fed_by_a: null, fed_by_b: null, winner_side: null, placed_match_id: null, is_knockout: true, bracket_slot: 1 },
+    { id: 'e2e-ko-qf2', tournament_id: DEFAULT_TOUR, category_id: 'e2e-cat-ko', scheduled_start: null, table_label: null, group_label: null, round_label: 'QF', team_a: null, team_b: null, fed_by_a: null, fed_by_b: null, winner_side: null, placed_match_id: null, is_knockout: true, bracket_slot: 2 },
+    { id: 'e2e-ko-qf3', tournament_id: DEFAULT_TOUR, category_id: 'e2e-cat-ko', scheduled_start: null, table_label: null, group_label: null, round_label: 'QF', team_a: null, team_b: null, fed_by_a: null, fed_by_b: null, winner_side: null, placed_match_id: null, is_knockout: true, bracket_slot: 3 },
+    { id: 'e2e-ko-qf4', tournament_id: DEFAULT_TOUR, category_id: 'e2e-cat-ko', scheduled_start: null, table_label: null, group_label: null, round_label: 'QF', team_a: null, team_b: null, fed_by_a: null, fed_by_b: null, winner_side: null, placed_match_id: null, is_knockout: true, bracket_slot: 4 },
+    { id: 'e2e-ko-p1', tournament_id: DEFAULT_TOUR, category_id: 'e2e-cat-ko', scheduled_start: '2098-01-02T14:00:00+00:00', table_label: 'T2', group_label: null, round_label: 'QF', team_a: null, team_b: null, fed_by_a: null, fed_by_b: null, winner_side: null, placed_match_id: null, is_knockout: true, bracket_slot: null },
+    { id: 'e2e-ko-p2', tournament_id: DEFAULT_TOUR, category_id: 'e2e-cat-ko', scheduled_start: '2098-01-02T14:00:00+00:00', table_label: 'T3', group_label: null, round_label: 'QF', team_a: null, team_b: null, fed_by_a: null, fed_by_b: null, winner_side: null, placed_match_id: null, is_knockout: true, bracket_slot: null },
+    { id: 'e2e-ko-sf1', tournament_id: DEFAULT_TOUR, category_id: 'e2e-cat-ko', scheduled_start: '2098-01-02T16:00:00+00:00', table_label: 'T2', group_label: null, round_label: 'SF', team_a: null, team_b: null, fed_by_a: 'e2e-ko-qf1', fed_by_b: 'e2e-ko-qf2', winner_side: null, placed_match_id: null, is_knockout: true, bracket_slot: 1 },
+    { id: 'e2e-ko-sf2', tournament_id: DEFAULT_TOUR, category_id: 'e2e-cat-ko', scheduled_start: '2098-01-02T16:00:00+00:00', table_label: 'T3', group_label: null, round_label: 'SF', team_a: null, team_b: null, fed_by_a: 'e2e-ko-qf3', fed_by_b: 'e2e-ko-qf4', winner_side: null, placed_match_id: null, is_knockout: true, bracket_slot: 2 },
+    { id: 'e2e-ko-f1', tournament_id: DEFAULT_TOUR, category_id: 'e2e-cat-ko', scheduled_start: '2098-01-02T18:00:00+00:00', table_label: 'T1', group_label: null, round_label: 'F', team_a: null, team_b: null, fed_by_a: 'e2e-ko-sf1', fed_by_b: 'e2e-ko-sf2', winner_side: null, placed_match_id: null, is_knockout: true, bracket_slot: 1 },
+    { id: 'e2e-korls-g1', tournament_id: DEFAULT_TOUR, category_id: 'e2e-cat-ko-rls', scheduled_start: '2098-01-01T10:00:00+00:00', table_label: null, group_label: 'A', round_label: 'Round 1', team_a: 'e2e-ka', team_b: 'e2e-kb', fed_by_a: null, fed_by_b: null, winner_side: null, placed_match_id: null, is_knockout: false, bracket_slot: null },
+    { id: 'e2e-korls-slot', tournament_id: DEFAULT_TOUR, category_id: 'e2e-cat-ko-rls', scheduled_start: null, table_label: null, group_label: null, round_label: 'QF', team_a: null, team_b: null, fed_by_a: null, fed_by_b: null, winner_side: null, placed_match_id: null, is_knockout: true, bracket_slot: null },
+    { id: 'e2e-korls-pool', tournament_id: DEFAULT_TOUR, category_id: 'e2e-cat-ko-rls', scheduled_start: '2098-01-02T14:00:00+00:00', table_label: 'T9', group_label: null, round_label: 'QF', team_a: null, team_b: null, fed_by_a: null, fed_by_b: null, winner_side: null, placed_match_id: null, is_knockout: true, bracket_slot: null }
+  ])
+  await restUpsert(adminToken, 'tie_formats', [
+    { category_id: 'e2e-cat-ko', tournament_id: DEFAULT_TOUR, rubbers: [{ format: 'singles', constraint: { allowedGenders: ['M'] } }], usage_policy: null, lead_time_minutes: 30 },
+    { category_id: 'e2e-cat-ko-rls', tournament_id: DEFAULT_TOUR, rubbers: [{ format: 'singles', constraint: { allowedGenders: ['M'] } }], usage_policy: null, lead_time_minutes: 30 }
+  ])
+
   // A pre-existing submitted lineup (Alpha) so the admin dashboard reliably has
   // a row to show regardless of parallel spec timing.
   await restUpsert(adminToken, 'lineups', [
@@ -218,6 +267,7 @@ export default async function globalSetup(): Promise<void> {
   // 3. Provision the managers via the real edge function (Alpha + Bravo).
   await provisionManager(adminToken, TEST_MANAGER_EMAIL, TEST_MANAGER_PASSWORD, 'e2e-a')
   await provisionManager(adminToken, TEST_MANAGER2_EMAIL, TEST_MANAGER2_PASSWORD, 'e2e-b')
+  await provisionManager(adminToken, TEST_MANAGER3_EMAIL, TEST_MANAGER3_PASSWORD, 'e2e-ka')
 
   // 3b. Converge manager1 back to the forced-first-login state. manager.spec is
   // destructive — it COMPLETES the password change — so a re-run without a db
@@ -230,6 +280,8 @@ export default async function globalSetup(): Promise<void> {
   // e2e can sign straight in to /manager. This decouples it from manager.spec's
   // destructive forced-change flow (and from retry-after-password-change).
   await completeFirstLogin(TEST_MANAGER2_EMAIL, TEST_MANAGER2_PASSWORD, TEST_MANAGER2_NEW_PASSWORD)
+  // And manager3 likewise, for the knockout RLS spec.
+  await completeFirstLogin(TEST_MANAGER3_EMAIL, TEST_MANAGER3_PASSWORD, TEST_MANAGER3_NEW_PASSWORD)
 }
 
 /**

@@ -238,7 +238,7 @@ onMounted(async () => {
                           size="small"
                           :variant="row.winnerSide === 'a' ? 'flat' : 'tonal'"
                           :color="row.winnerSide === 'a' ? 'primary' : 'default'"
-                          :disabled="!row.canPickA && row.winnerSide !== 'a'"
+                          :disabled="busy || (!row.canPickA && row.winnerSide !== 'a')"
                           :title="row.winnerSide === 'a' ? 'click again to un-pick' : ''"
                           @click="onToggle(row.slotId, 0)"
                         >{{ row.sideA.name }}</v-btn>
@@ -248,6 +248,7 @@ onMounted(async () => {
                           size="x-small"
                           variant="text"
                           title="remove team"
+                          :disabled="busy"
                           @click="onClear(row.slotId, 0)"
                         />
                       </template>
@@ -273,7 +274,7 @@ onMounted(async () => {
                           size="small"
                           :variant="row.winnerSide === 'b' ? 'flat' : 'tonal'"
                           :color="row.winnerSide === 'b' ? 'primary' : 'default'"
-                          :disabled="!row.canPickB && row.winnerSide !== 'b'"
+                          :disabled="busy || (!row.canPickB && row.winnerSide !== 'b')"
                           :title="row.winnerSide === 'b' ? 'click again to un-pick' : ''"
                           @click="onToggle(row.slotId, 1)"
                         >{{ row.sideB.name }}</v-btn>
@@ -283,6 +284,7 @@ onMounted(async () => {
                           size="x-small"
                           variant="text"
                           title="remove team"
+                          :disabled="busy"
                           @click="onClear(row.slotId, 1)"
                         />
                       </template>

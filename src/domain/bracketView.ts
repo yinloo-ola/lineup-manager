@@ -59,9 +59,10 @@ export interface BracketView {
   entryRoundLabel: string | null
 }
 
-/** A display label for a pool match chip / assign option. */
+/** A display label for a pool match chip / assign option — tournament-local
+ *  time (the seed's offset-less form), not the raw stored instant. */
 export function poolMatchLabel(p: { start: string; table: string }): string {
-  return `${p.table} · ${p.start.replace('T', ' ')}`
+  return `${p.table} · ${p.start.slice(0, 16).replace('T', ' ')}`
 }
 
 export function buildBracketView(
