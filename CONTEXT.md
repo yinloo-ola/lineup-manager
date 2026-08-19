@@ -28,6 +28,10 @@ _Avoid_: tie, fixture, rubber-set
 One individual discipline contest within a team match (e.g. Men's Singles, Mixed Doubles), with its own player constraints. Played as best-of-N games.
 _Avoid_: rubber, game, slot
 
+**Bracket Slot**:
+One of the two team positions in a knockout team match. Identified by its bracket position (round and slot) before either team is known; filled progressively — the first knockout round after the group stage, later rounds as the previous round completes.
+_Avoid_: placeholder, TBD entry, player slot
+
 **Game**:
 One scoring game within a match (table tennis: first to 11). Beyond the lineup system, which assigns players to matches — a player plays all games of their match.
 _Avoid_: point, set
