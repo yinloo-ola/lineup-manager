@@ -30,6 +30,10 @@ export interface AdminTieInput {
   round?: string
   /** Null side = TBD (knockout). */
   teamIds: [string | null, string | null]
+  /** Knockout metadata (spec §7): drives the dashboard merge + bracket links. */
+  isKnockout?: boolean
+  /** On a placed entry slot: the pool match bound to it. */
+  placedMatchId?: string | null
 }
 
 export interface AdminLineupRow extends AdminLineupInput {

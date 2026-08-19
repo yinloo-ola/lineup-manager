@@ -28,6 +28,12 @@ const router = createRouter({
           alias: '/admin/lineups'
         },
         {
+          path: 'bracket/:categoryId?',
+          name: 'bracket',
+          component: () => import('@/views/BracketView.vue'),
+          meta: { title: 'Bracket' }
+        },
+        {
           path: 'setup',
           name: 'setup',
           component: () => import('@/views/SetupEmptyView.vue'),

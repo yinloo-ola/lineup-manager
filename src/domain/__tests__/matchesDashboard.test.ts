@@ -4,6 +4,7 @@ import {
   compareMatchRows,
   matchMatchesFilter,
   matchMissesCutoff,
+  mergeKnockoutForDashboard,
   type BuildMatchRowsArgs
 } from '../matchesDashboard'
 import type { AdminLineupInput, AdminTieInput } from '../adminView'
@@ -251,5 +252,30 @@ describe('buildMatchRows — knockout TBD sides (ko-import #12)', () => {
     expect(unscheduled.locked).toBe(false)
     expect(unscheduled.cutoff).toBeNull()
     expect(rows[rows.length - 1].tieId).toBe('t0')
+  })
+})
+
+describe('mergeKnockoutForDashboard (ko-import §7)', () => {
+  const ko = (id: string, extras: Partial<AdminTieInput> = {}): AdminTieInput =>
+    tie({ tieId: id, teamIds: [null, null], isKnockout: true, ...extras })
+
+  it('placed slots adopt their pool schedule; bound pool rows and byes drop', () => {
+    const ties = [
+      tie({ tieId: 'g1' }),
+      ko('slot1', { teamIds: ['Alpha', 'Bravo'], placedMatchId: 'pool1' }),
+      ko('pool1', { scheduledStart: FUTURE, table: 'T2' }),
+      ko('pool2', { scheduledStart: FUTURE, table: 'T3' }),
+      ko('bye1', { scheduledStart: null })
+    ]
+    const merged = mergeKnockoutForDashboard(ties)
+    const ids = merged.map((t) => t.tieId)
+    expect(ids).toEqual(['g1', 'slot1', 'pool2'])
+    const slot1 = merged.find((t) => t.tieId === 'slot1')!
+    expect(slot1.scheduledStart).toBe(FUTURE)
+    expect(slot1.table).toBe('T2')
+    expect(slot1.teamIds).toEqual(['Alpha', 'Bravo'])
+    // The unplaced pool entry stays as a generic TBD row.
+    const pool2 = merged.find((t) => t.tieId === 'pool2')!
+    expect(pool2.teamIds).toEqual([null, null])
   })
 })

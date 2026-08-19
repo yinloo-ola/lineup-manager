@@ -5,7 +5,12 @@
 // lineup a confirmed format edit broke. Reuses buildAdminLineupRows for the
 // per-lineup re-validation. Pure: no UI, no network.
 
-import { buildAdminLineupRows, type AdminLineupRow, type BuildAdminLineupRowsArgs } from './adminView'
+import {
+  buildAdminLineupRows,
+  type AdminLineupRow,
+  type AdminTieInput,
+  type BuildAdminLineupRowsArgs
+} from './adminView'
 import { computeCutoff, isLocked } from './cutoff'
 import type { LineupStatus } from './types'
 import { sideDisplayName } from './teamNames'
@@ -29,6 +34,9 @@ export interface MatchSide {
 
 export interface MatchRow {
   tieId: string
+  categoryId: string
+  /** True for knockout rows — the dashboard links them into the bracket view. */
+  isKnockout: boolean
   /** Null = an unscheduled knockout slot (never locks). */
   scheduledStart: string | null
   /** Seed-sourced metadata, shown where available (undefined when absent). */
@@ -87,8 +95,32 @@ export function compareMatchRows(a: MatchRow, b: MatchRow): number {
   return a.table.localeCompare(b.table)
 }
 
+/** Knockout rows as the dashboard renders them (spec §7): a placed entry slot
+ *  adopts its pool match's schedule; pool matches bound to a slot are dropped
+ *  (the slot renders); unplaced pool entries stay as generic TBD rows; byes —
+ *  unscheduled, unplaced slots — never appear. Pure. */
+export function mergeKnockoutForDashboard(ties: AdminTieInput[]): AdminTieInput[] {
+  const byId = new Map(ties.map((t) => [t.tieId, t]))
+  const placedPoolIds = new Set(
+    ties.filter((t) => t.isKnockout && t.placedMatchId).map((t) => t.placedMatchId as string)
+  )
+  return ties.flatMap((t) => {
+    if (!t.isKnockout) return [t]
+    if (t.placedMatchId) {
+      const pool = byId.get(t.placedMatchId)
+      return pool
+        ? [{ ...t, scheduledStart: pool.scheduledStart, table: pool.table ?? t.table }]
+        : [t]
+    }
+    if (placedPoolIds.has(t.tieId)) return [] // bound pool — its slot renders
+    if (t.scheduledStart !== null) return [t] // unplaced pool entry / later round
+    return [] // bye — never shown on the dashboard
+  })
+}
+
 export function buildMatchRows(args: BuildMatchRowsArgs): MatchRow[] {
-  const { ties, teamNameById, rosterByTeam } = args
+  const { teamNameById, rosterByTeam } = args
+  const ties = mergeKnockoutForDashboard(args.ties)
   const lineups = args.lineups.filter((l) => ties.some((t) => t.tieId === l.tieId))
   const validated: AdminLineupRow[] = buildAdminLineupRows({ ...args, lineups })
   const rowByTeam = new Map(validated.map((r) => [`${r.tieId}:${r.teamId}`, r]))
@@ -134,6 +166,8 @@ export function buildMatchRows(args: BuildMatchRowsArgs): MatchRow[] {
     )
     return {
       tieId: tie.tieId,
+      categoryId: tie.categoryId,
+      isKnockout: tie.isKnockout ?? false,
       scheduledStart: tie.scheduledStart,
       table: tie.table,
       group: tie.group,

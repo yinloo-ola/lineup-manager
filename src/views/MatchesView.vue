@@ -87,6 +87,7 @@ onMounted(load)
                 <th>Table</th>
                 <th>Group · Round</th>
                 <th colspan="2">Teams</th>
+                <th></th>
               </tr>
             </thead>
             <tbody>
@@ -108,6 +109,15 @@ onMounted(load)
                     <span>{{ s.teamName }}</span>
                     <MatchStatusChips :side="s" />
                   </div>
+                </td>
+                <td>
+                  <v-btn
+                    v-if="m.isKnockout"
+                    size="x-small"
+                    variant="text"
+                    @click.stop
+                    :to="{ name: 'bracket', params: { categoryId: m.categoryId } }"
+                  >Bracket</v-btn>
                 </td>
               </tr>
             </tbody>

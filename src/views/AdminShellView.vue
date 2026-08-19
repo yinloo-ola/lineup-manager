@@ -40,6 +40,13 @@ async function onSignOut(): Promise<void> {
         :disabled="!hasTournament"
         to="/matches"
       />
+      <v-list-item
+        :active="$route.name === 'bracket'"
+        prepend-icon="mdi-trophy-outline"
+        title="Bracket"
+        :disabled="!hasTournament"
+        to="/bracket"
+      />
       <v-divider class="my-2" />
       <div class="px-4 pt-2 text-overline text-medium-emphasis">Tournament setup</div>
       <v-list-item

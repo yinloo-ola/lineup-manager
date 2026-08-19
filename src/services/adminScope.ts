@@ -39,6 +39,8 @@ interface TieDbRow {
   round_label: string | null
   team_a: string | null
   team_b: string | null
+  is_knockout: boolean | null
+  placed_match_id: string | null
 }
 interface TeamDbRow {
   id: string
@@ -73,7 +75,7 @@ export async function fetchAdminScopeData(
   const [lineupsRes, teamsRes, tiesRes, catsRes, formatsRes, playersRes, tourRes] = await Promise.all([
     client.from('lineups').select('tie_id, team_id, status, player_ids, submitted_at, updated_at, updated_by').eq('tournament_id', tournamentId),
     client.from('teams').select('id, name').eq('tournament_id', tournamentId),
-    client.from('ties').select('id, category_id, scheduled_start, table_label, group_label, round_label, team_a, team_b').eq('tournament_id', tournamentId),
+    client.from('ties').select('id, category_id, scheduled_start, table_label, group_label, round_label, team_a, team_b, is_knockout, placed_match_id').eq('tournament_id', tournamentId),
     client.from('categories').select('id, name').eq('tournament_id', tournamentId),
     client.from('tie_formats').select('category_id, rubbers, usage_policy, lead_time_minutes').eq('tournament_id', tournamentId),
     client.from('players').select('id, team_id, name, gender, date_of_birth').eq('tournament_id', tournamentId),
@@ -99,7 +101,9 @@ export async function fetchAdminScopeData(
     table: t.table_label ?? undefined,
     group: t.group_label ?? undefined,
     round: t.round_label ?? undefined,
-    teamIds: [t.team_a, t.team_b]
+    teamIds: [t.team_a, t.team_b],
+    isKnockout: t.is_knockout ?? false,
+    placedMatchId: t.placed_match_id
   }))
   const formats = (formatsRes.data as FormatDbRow[] | null) ?? []
   const rosterByTeam = new Map<string, Player[]>()
