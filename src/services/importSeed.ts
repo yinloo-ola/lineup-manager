@@ -102,17 +102,27 @@ export function toTablePayloads(
       gender: p.gender,
       date_of_birth: p.dateOfBirth
     })),
-    ties: seed.ties.map((t) => ({
-      id: freshId(t.id),
-      tournament_id: tournamentId,
-      category_id: freshId(t.categoryId),
-      scheduled_start: t.scheduledStart,
-      table_label: t.table ?? null,
-      group_label: t.group ?? null,
-      round_label: t.round ?? null,
-      team_a: freshId(t.teamIds[0]),
-      team_b: freshId(t.teamIds[1])
-    }))
+    ties: seed.ties.map((t) => {
+      if (!('teamIds' in t)) {
+        // Knockout pool/fed ties need the bracket columns (nullable teams,
+        // feeds, placement) — they arrive with the bracket migration, not the
+        // parser change.
+        throw new Error(
+          'Import failed — knockout ties are not importable yet (bracket schema pending).'
+        )
+      }
+      return {
+        id: freshId(t.id),
+        tournament_id: tournamentId,
+        category_id: freshId(t.categoryId),
+        scheduled_start: t.scheduledStart,
+        table_label: t.table ?? null,
+        group_label: t.group ?? null,
+        round_label: t.round ?? null,
+        team_a: freshId(t.teamIds[0]),
+        team_b: freshId(t.teamIds[1])
+      }
+    })
   }
 }
 

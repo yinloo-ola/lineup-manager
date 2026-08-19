@@ -1,13 +1,13 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "https://lineup-manager/seed-contract.schema.json",
-  "title": "Seed contract v1",
-  "description": "The tournament JSON exported by the organizer tool (tournament-manager) and imported here via 'Import tournament…'. Canonical doc: docs/seed-contract.md. Enforced by src/domain/seed.ts (parseSeed).",
+  "title": "Seed contract v2",
+  "description": "The tournament JSON exported by the organizer tool (tournament-manager) and imported here via 'Import tournament…'. Canonical doc: docs/seed-contract.md. Enforced by src/domain/seed.ts (parseSeed), which additionally validates calendar dates and cross-checks bracket wiring.",
   "type": "object",
   "additionalProperties": false,
   "required": ["seedVersion", "tournamentName", "categories", "teams", "players", "ties"],
   "properties": {
-    "seedVersion": { "const": 1 },
+    "seedVersion": { "const": 2 },
     "tournamentName": { "type": "string" },
     "startDate": {
       "type": "string",
@@ -58,6 +58,7 @@
           "gender": { "type": "string" },
           "dateOfBirth": {
             "type": "string",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}$|^\\d+$",
             "description": "yyyy-mm-dd, or an Excel serial-day number (normalized on import)."
           }
         }
@@ -65,22 +66,108 @@
     },
     "ties": {
       "type": "array",
+      "description": "Group ties (both teams), the knockout entry round's unplaced pool, and positional fed later-round ties. A tie carries teamIds xor fedBy (pool ties carry neither).",
+      "items": {
+        "oneOf": [
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["id", "categoryId", "scheduledStart", "group", "round", "teamIds"],
+            "properties": {
+              "id": { "type": "string" },
+              "categoryId": { "type": "string" },
+              "scheduledStart": { "type": "string" },
+              "table": { "type": "string" },
+              "group": { "type": "string" },
+              "round": { "type": "string" },
+              "teamIds": {
+                "type": "array",
+                "minItems": 2,
+                "maxItems": 2,
+                "items": { "type": "string" }
+              }
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["id", "categoryId", "scheduledStart", "table", "round"],
+            "description": "Knockout entry-round pool tie — unplaced (no position, no teams, no fedBy, no group).",
+            "properties": {
+              "id": { "type": "string" },
+              "categoryId": { "type": "string" },
+              "scheduledStart": { "type": "string" },
+              "table": { "type": "string" },
+              "round": {
+                "type": "string",
+                "enum": ["R256", "R128", "R64", "R32", "R16", "QF", "SF", "F"]
+              }
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["id", "categoryId", "scheduledStart", "table", "round", "fedBy"],
+            "description": "Knockout later-round tie — positional, both sides fed.",
+            "properties": {
+              "id": { "type": "string" },
+              "categoryId": { "type": "string" },
+              "scheduledStart": { "type": "string" },
+              "table": { "type": "string" },
+              "round": {
+                "type": "string",
+                "enum": ["R256", "R128", "R64", "R32", "R16", "QF", "SF", "F"]
+              },
+              "fedBy": {
+                "type": "array",
+                "minItems": 2,
+                "maxItems": 2,
+                "items": { "type": "string" }
+              }
+            }
+          }
+        ]
+      }
+    },
+    "brackets": {
+      "type": "array",
+      "description": "Knockout bracket structure per category — required when any knockout ties exist, omitted when no category has a knockout stage.",
       "items": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["id", "categoryId", "scheduledStart", "teamIds"],
+        "required": ["categoryId", "rounds"],
         "properties": {
-          "id": { "type": "string" },
           "categoryId": { "type": "string" },
-          "scheduledStart": { "type": "string" },
-          "table": { "type": "string" },
-          "group": { "type": "string", "description": "Human label; absent for knockout ties." },
-          "round": { "type": "string" },
-          "teamIds": {
+          "rounds": {
             "type": "array",
-            "minItems": 2,
-            "maxItems": 2,
-            "items": { "type": "string" }
+            "minItems": 1,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["label", "slots"],
+              "properties": {
+                "label": {
+                  "type": "string",
+                  "enum": ["R256", "R128", "R64", "R32", "R16", "QF", "SF", "F"]
+                },
+                "slots": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 128,
+                  "description": "Power of two; rounds halve (enforced by the parser)."
+                },
+                "fedBy": {
+                  "type": "array",
+                  "description": "From the second round on: per slot, the feeder slot ids for side 1 and side 2 (wiring cross-checked by the parser).",
+                  "items": {
+                    "type": "array",
+                    "minItems": 2,
+                    "maxItems": 2,
+                    "items": { "type": "string" }
+                  }
+                }
+              }
+            }
           }
         }
       }
