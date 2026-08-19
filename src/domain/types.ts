@@ -61,16 +61,28 @@ export interface Player {
   dateOfBirth: string // yyyy-mm-dd
 }
 
-/** A team-vs-team fixture (corresponds to a scheduled team match). */
+/** A team-vs-team fixture (corresponds to a scheduled team match).
+ *
+ *  Knockout team matches import before their teams are known: sides are null
+ *  until filled (TBD), and a slot row carries no schedule until a pool match
+ *  is placed onto it. Group ties always carry both teams and a schedule. */
 export interface Tie {
   id: string
-  /** ISO date-time, tournament-local, of the scheduled start. */
-  scheduledStart: string
+  /** ISO date-time, tournament-local, of the scheduled start; null = an
+   *  unscheduled knockout slot (never locks, expects no lineup). */
+  scheduledStart: string | null
   table?: string
   /** Human-label group/round from the seed, where the schedule has them. */
   group?: string
   round?: string
-  teamIds: [string, string]
+  /** The two sides; null = TBD (knockout only). */
+  teamIds: [string | null, string | null]
+  /** Knockout bracket metadata, present on knockout rows. */
+  isKnockout?: boolean
+  /** The feeder tie ids per side (positional knockout rows). */
+  fedBy?: [string | null, string | null]
+  /** The winning side once decided/advanced. */
+  winnerSide?: 'a' | 'b'
 }
 
 export type LineupStatus = 'not-started' | 'draft' | 'submitted' | 'invalidated'

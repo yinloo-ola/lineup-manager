@@ -33,12 +33,12 @@ interface LineupDbRow {
 interface TieDbRow {
   id: string
   category_id: string
-  scheduled_start: string
+  scheduled_start: string | null
   table_label: string | null
   group_label: string | null
   round_label: string | null
-  team_a: string
-  team_b: string
+  team_a: string | null
+  team_b: string | null
 }
 interface TeamDbRow {
   id: string

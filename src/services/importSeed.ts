@@ -1,5 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
-import type { SeedFile } from '@/domain/seed'
+import type { SeedFile, SeedTie } from '@/domain/seed'
 import { resolveStartDate } from '@/domain/seed'
 import { nameClashes } from '@/domain/tournamentManage'
 
@@ -33,12 +33,17 @@ export interface TablePayloads {
     id: string
     tournament_id: string
     category_id: string
-    scheduled_start: string
+    scheduled_start: string | null
     table_label: string | null
     group_label: string | null
     round_label: string | null
-    team_a: string
-    team_b: string
+    team_a: string | null
+    team_b: string | null
+    fed_by_a: string | null
+    fed_by_b: string | null
+    winner_side: null
+    is_knockout: boolean
+    placed_match_id: string | null
   }[]
 }
 
@@ -48,18 +53,44 @@ export type IdFactory = () => string
 /** The default id source: a cryptographically-unique id (browser + Node ≥ 19). */
 const defaultIdFactory: IdFactory = () => globalThis.crypto.randomUUID()
 
+/** The positional slot-id scheme for a bracket round (producer and consumer
+ *  agree on it): `<shortName>|ko|LABEL|n`, 1-based. */
+function slotId(shortName: string, label: string, n: number): string {
+  return `${shortName}|ko|${label}|${n}`
+}
+
 /**
  * Assign a fresh id to every seed entity, returning a seed-id -> fresh-id map.
- * Callers re-link references (player->team, tie->category/teams) through the map.
- * Pure given the id factory. The iteration order is the FK-safe insert order
- * (categories, teams, players, ties).
+ * Callers re-link references (player->team, tie->category/teams, KO feeds->slots)
+ * through the map. Pure given the id factory. Bracket slots are minted FIRST:
+ * a fed tie's id IS its slot id, so both resolve to one minted row id.
  */
 export function buildIdMap(seed: SeedFile, idFactory: IdFactory): Map<string, string> {
   const map = new Map<string, string>()
   for (const c of seed.categories) map.set(c.id, idFactory())
   for (const t of seed.teams) map.set(t.id, idFactory())
   for (const p of seed.players) map.set(p.id, idFactory())
-  for (const t of seed.ties) map.set(t.id, idFactory())
+  const shortNameByCategoryId = new Map(seed.categories.map((c) => [c.id, c.shortName] as const))
+  for (const bracket of seed.brackets ?? []) {
+    const shortName = shortNameByCategoryId.get(bracket.categoryId)
+    if (shortName === undefined) continue // parseSeed guarantees resolution
+    for (const round of bracket.rounds) {
+      for (let n = 1; n <= round.slots; n++) {
+        map.set(slotId(shortName, round.label, n), idFactory())
+      }
+    }
+  }
+  for (const t of seed.ties) {
+    if (map.has(t.id)) {
+      // A fed tie's id IS its slot id (minted above); any other collision
+      // would silently merge two rows into one id — refuse loudly.
+      if (!('fedBy' in t)) {
+        throw new Error(`Seed tie id "${t.id}" collides with a derived bracket slot id.`)
+      }
+      continue
+    }
+    map.set(t.id, idFactory())
+  }
   return map
 }
 
@@ -80,6 +111,83 @@ export function toTablePayloads(
     if (minted === undefined) throw new Error(`No minted id for seed id "${seedId}"`)
     return minted
   }
+
+  const tieRows: TablePayloads['ties'] = []
+  for (const t of seed.ties) {
+    const base = {
+      tournament_id: tournamentId,
+      category_id: freshId(t.categoryId),
+      group_label: null as string | null,
+      winner_side: null,
+      is_knockout: false,
+      placed_match_id: null as string | null
+    }
+    if ('teamIds' in t) {
+      tieRows.push({
+        ...base,
+        id: freshId(t.id),
+        scheduled_start: t.scheduledStart,
+        table_label: t.table ?? null,
+        group_label: t.group,
+        round_label: t.round,
+        team_a: freshId(t.teamIds[0]),
+        team_b: freshId(t.teamIds[1]),
+        fed_by_a: null,
+        fed_by_b: null,
+        is_knockout: false
+      })
+    } else {
+      // Knockout tie — pool (no fedBy: table + time, no position, no teams —
+      // the admin places it in the bracket view) or fed later round.
+      const feeds = 'fedBy' in t ? t.fedBy : null
+      tieRows.push({
+        ...base,
+        id: freshId(t.id),
+        scheduled_start: t.scheduledStart,
+        table_label: t.table,
+        round_label: t.round,
+        team_a: null,
+        team_b: null,
+        fed_by_a: feeds ? freshId(feeds[0]) : null,
+        fed_by_b: feeds ? freshId(feeds[1]) : null,
+        is_knockout: true
+      })
+    }
+  }
+
+  // Structural slot rows: every bracket slot exists as a tie row, bye slots
+  // included. Slots occupied by a fed tie are emitted above (same minted id,
+  // with the schedule); the rest — the entire entry round and any unscheduled
+  // later-round slot — carry no schedule and no teams.
+  const shortNameByCategoryId = new Map(seed.categories.map((c) => [c.id, c.shortName] as const))
+  const fedTieIds = new Set(seed.ties.filter((t): t is Extract<SeedTie, { fedBy: [string, string] }> => 'fedBy' in t).map((t) => t.id))
+  for (const bracket of seed.brackets ?? []) {
+    const shortName = shortNameByCategoryId.get(bracket.categoryId)!
+    for (const round of bracket.rounds) {
+      for (let n = 1; n <= round.slots; n++) {
+        const seedSlotId = slotId(shortName, round.label, n)
+        if (fedTieIds.has(seedSlotId)) continue
+        const feeds = round.fedBy?.[n - 1]
+        tieRows.push({
+          id: freshId(seedSlotId),
+          tournament_id: tournamentId,
+          category_id: freshId(bracket.categoryId),
+          scheduled_start: null,
+          table_label: null,
+          group_label: null,
+          round_label: round.label,
+          team_a: null,
+          team_b: null,
+          fed_by_a: feeds ? freshId(feeds[0]) : null,
+          fed_by_b: feeds ? freshId(feeds[1]) : null,
+          winner_side: null,
+          is_knockout: true,
+          placed_match_id: null
+        })
+      }
+    }
+  }
+
   return {
     categories: seed.categories.map((c) => ({
       id: freshId(c.id),
@@ -102,27 +210,7 @@ export function toTablePayloads(
       gender: p.gender,
       date_of_birth: p.dateOfBirth
     })),
-    ties: seed.ties.map((t) => {
-      if (!('teamIds' in t)) {
-        // Knockout pool/fed ties need the bracket columns (nullable teams,
-        // feeds, placement) — they arrive with the bracket migration, not the
-        // parser change.
-        throw new Error(
-          'Import failed — knockout ties are not importable yet (bracket schema pending).'
-        )
-      }
-      return {
-        id: freshId(t.id),
-        tournament_id: tournamentId,
-        category_id: freshId(t.categoryId),
-        scheduled_start: t.scheduledStart,
-        table_label: t.table ?? null,
-        group_label: t.group ?? null,
-        round_label: t.round ?? null,
-        team_a: freshId(t.teamIds[0]),
-        team_b: freshId(t.teamIds[1])
-      }
-    })
+    ties: tieRows
   }
 }
 

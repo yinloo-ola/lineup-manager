@@ -8,6 +8,7 @@
 import { buildAdminLineupRows, type AdminLineupRow, type BuildAdminLineupRowsArgs } from './adminView'
 import { computeCutoff, isLocked } from './cutoff'
 import type { LineupStatus } from './types'
+import { sideDisplayName } from './teamNames'
 
 export type BuildMatchRowsArgs = BuildAdminLineupRowsArgs
 
@@ -15,7 +16,8 @@ export type BuildMatchRowsArgs = BuildAdminLineupRowsArgs
 export type SideStatus = 'submitted' | 'not-submitted' | 'missed-cutoff'
 
 export interface MatchSide {
-  teamId: string
+  /** Null = TBD (knockout side not yet filled). */
+  teamId: string | null
   teamName: string
   status: SideStatus
   /** A submitted lineup the current structure has broken (reads Not submitted + marker). */
@@ -27,14 +29,15 @@ export interface MatchSide {
 
 export interface MatchRow {
   tieId: string
-  scheduledStart: string
+  /** Null = an unscheduled knockout slot (never locks). */
+  scheduledStart: string | null
   /** Seed-sourced metadata, shown where available (undefined when absent). */
   table?: string
   group?: string
   round?: string
   /** Aligned to the tie's teamIds. */
   sides: [MatchSide, MatchSide]
-  cutoff: string
+  cutoff: string | null
   locked: boolean
 }
 
@@ -69,10 +72,11 @@ export function matchMatchesFilter(match: MatchRow, filter: MatchFilter): boolea
 }
 
 /** Ascending by scheduled time, then table number (numeric where both are;
- *  no table sorts after a present one). */
+ *  no table sorts after a present one; no schedule sorts after everything). */
 export function compareMatchRows(a: MatchRow, b: MatchRow): number {
-  const byTime =
-    new Date(a.scheduledStart).getTime() - new Date(b.scheduledStart).getTime()
+  const ta = a.scheduledStart === null ? Number.POSITIVE_INFINITY : new Date(a.scheduledStart).getTime()
+  const tb = b.scheduledStart === null ? Number.POSITIVE_INFINITY : new Date(b.scheduledStart).getTime()
+  const byTime = ta - tb
   if (byTime !== 0) return byTime
   if (a.table === b.table) return a.tieId.localeCompare(b.tieId)
   if (a.table == null) return 1
@@ -97,13 +101,25 @@ export function buildMatchRows(args: BuildMatchRowsArgs): MatchRow[] {
     const locked = isLocked(cutoff, args.now)
     const sides = tie.teamIds.map(
       (teamId): MatchSide => {
+        if (teamId === null) {
+          // A TBD side has no team, no lineup, nothing to miss — it can never
+          // read Missed cutoff (the per-side cutoff rule).
+          return {
+            teamId: null,
+            teamName: 'TBD',
+            status: 'not-submitted',
+            needsAttention: false,
+            players: null,
+            submittedAt: null
+          }
+        }
         const row = rowByTeam.get(`${tie.tieId}:${teamId}`)
         const effective = row?.effectiveStatus ?? null
         const roster = rosterByTeam.get(teamId) ?? []
         const nameById = new Map(roster.map((p) => [p.id, p.name]))
         return {
           teamId,
-          teamName: teamNameById.get(teamId) ?? teamId,
+          teamName: sideDisplayName(teamId, teamNameById),
           status: deriveSideStatus(effective, locked),
           needsAttention: effective === 'invalidated',
           players:

@@ -31,8 +31,8 @@ const filtered = computed(() =>
   matches.value.filter((m) => matchMatchesFilter(m, filter.value))
 )
 
-function fmt(iso: string): string {
-  return new Date(iso).toLocaleString()
+function fmt(iso: string | null): string {
+  return iso === null ? '—' : new Date(iso).toLocaleString()
 }
 
 /** group · round metadata parts, shown where the seed provides them. */
@@ -103,7 +103,7 @@ onMounted(load)
                 </td>
                 <td>{{ m.table ?? '—' }}</td>
                 <td>{{ groupRoundParts(m).join(' · ') || '—' }}</td>
-                <td v-for="s in m.sides" :key="s.teamId">
+                <td v-for="s in m.sides" :key="s.teamId ?? 'tbd'">
                   <div class="d-flex flex-wrap align-center ga-2">
                     <span>{{ s.teamName }}</span>
                     <MatchStatusChips :side="s" />
@@ -130,7 +130,7 @@ onMounted(load)
         </v-card-item>
         <v-card-text>
           <v-row>
-            <v-col v-for="s in selected.sides" :key="s.teamId" cols="12" md="6">
+            <v-col v-for="s in selected.sides" :key="s.teamId ?? 'tbd'" cols="12" md="6">
               <v-card variant="outlined" rounded="lg">
                 <v-card-item>
                   <v-card-title class="text-body-1">{{ s.teamName }}</v-card-title>

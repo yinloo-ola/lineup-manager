@@ -248,7 +248,7 @@ export function findDoubleBookings(ties: Tie[], lineups: Lineup[]): Violation[] 
   const slotPlayerTies = new Map<string, Map<string, string[]>>()
   for (const lineup of lineups) {
     const slot = startByTieId.get(lineup.tieId)
-    if (slot === undefined) continue
+    if (slot == null) continue // no schedule (unscheduled KO slot) — no slot to share
     let playerTies = slotPlayerTies.get(slot)
     if (!playerTies) {
       playerTies = new Map()

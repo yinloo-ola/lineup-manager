@@ -44,7 +44,7 @@ export function startDateEditError(
 export interface FormatBreak {
   teamName: string
   opponentName: string
-  scheduledStart: string
+  scheduledStart: string | null
 }
 
 /**

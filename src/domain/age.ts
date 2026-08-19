@@ -6,8 +6,11 @@
  * when the tournament has no `start_date`, preserving the pre-tournament-dimension
  * behaviour. Both inputs are ISO date-times; returns a `yyyy-mm-dd` date.
  */
-export function resolveAsOf(tournamentStart: string | null, tieStart: string): string {
-  return (tournamentStart ?? tieStart).slice(0, 10)
+export function resolveAsOf(tournamentStart: string | null, tieStart?: string | null): string {
+  // An empty anchor only arises with no tournament start AND an unscheduled
+  // knockout slot — running tournaments always carry a start date, so this
+  // never feeds a real age check in practice.
+  return (tournamentStart ?? tieStart ?? '').slice(0, 10)
 }
 
 /**

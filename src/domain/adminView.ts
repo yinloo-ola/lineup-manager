@@ -8,6 +8,7 @@ import { resolveAsOf } from './age'
 import { computeCutoff, isLocked } from './cutoff'
 import { effectiveStatus, lineupViolations } from './lineupBuilder'
 import type { Lineup, LineupStatus, Player, Tie, TieFormat } from './types'
+import { sideDisplayName } from './teamNames'
 
 export interface AdminLineupInput {
   tieId: string
@@ -22,19 +23,21 @@ export interface AdminLineupInput {
 export interface AdminTieInput {
   tieId: string
   categoryId: string
-  scheduledStart: string
+  /** Null = an unscheduled knockout slot. */
+  scheduledStart: string | null
   table?: string
   group?: string
   round?: string
-  teamIds: [string, string]
+  /** Null side = TBD (knockout). */
+  teamIds: [string | null, string | null]
 }
 
 export interface AdminLineupRow extends AdminLineupInput {
   teamName: string
   opponentName: string
   categoryName: string
-  scheduledStart: string
-  cutoff: string
+  scheduledStart: string | null
+  cutoff: string | null
   locked: boolean
   /** Stored status re-validated against the current structure. */
   effectiveStatus: LineupStatus
@@ -87,7 +90,7 @@ export function buildAdminLineupRows(args: BuildAdminLineupRowsArgs): AdminLineu
             tieFormat: fmt,
             tie: { id: tie.tieId, scheduledStart: tie.scheduledStart, teamIds: tie.teamIds },
             roster,
-            asOf: resolveAsOf(tournamentStart, tie.scheduledStart),
+            asOf: resolveAsOf(tournamentStart, tie.scheduledStart ?? undefined),
             teamTies: allTies,
             teamLineups: allLineups
           }
@@ -97,7 +100,7 @@ export function buildAdminLineupRows(args: BuildAdminLineupRowsArgs): AdminLineu
     rows.push({
       ...l,
       teamName: teamNameById.get(l.teamId) ?? l.teamId,
-      opponentName: teamNameById.get(opponentId) ?? opponentId,
+      opponentName: sideDisplayName(opponentId, teamNameById),
       categoryName: categoryNameById.get(tie.categoryId) ?? tie.categoryId,
       scheduledStart: tie.scheduledStart,
       cutoff,

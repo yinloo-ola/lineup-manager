@@ -25,10 +25,10 @@ interface PlayerRow {
 interface TieRow {
   id: string
   category_id: string
-  scheduled_start: string
+  scheduled_start: string | null
   table_label: string | null
-  team_a: string
-  team_b: string
+  team_a: string | null
+  team_b: string | null
 }
 interface LineupRow {
   tie_id: string

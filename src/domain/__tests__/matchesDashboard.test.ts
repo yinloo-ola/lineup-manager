@@ -228,3 +228,28 @@ describe('matchMatchesFilter', () => {
     expect(matchMatchesFilter(lockedBothSubmitted, 'past-cutoff')).toBe(true)
   })
 })
+
+describe('buildMatchRows — knockout TBD sides (ko-import #12)', () => {
+  it('renders a TBD side as not-submitted with no team, never missed-cutoff', () => {
+    const rows = buildMatchRows(
+      args({
+        ties: [tie({ teamIds: ['Alpha', null] })],
+        lineups: [lineup('t1', 'Alpha', 'not-started', [null])]
+      })
+    )
+    expect(rows[0].sides[1]).toMatchObject({ teamId: null, teamName: 'TBD', status: 'not-submitted' })
+  })
+
+  it('never locks and sorts last when a tie has no schedule', () => {
+    const rows = buildMatchRows(
+      args({
+        ties: [tie({ tieId: 't0', scheduledStart: null }), tie()],
+        lineups: []
+      })
+    )
+    const unscheduled = rows.find((r) => r.tieId === 't0')!
+    expect(unscheduled.locked).toBe(false)
+    expect(unscheduled.cutoff).toBeNull()
+    expect(rows[rows.length - 1].tieId).toBe('t0')
+  })
+})

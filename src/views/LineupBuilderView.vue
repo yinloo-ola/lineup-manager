@@ -218,8 +218,8 @@ async function onRecall(): Promise<void> {
   }
 }
 
-function fmt(iso: string): string {
-  return new Date(iso).toLocaleString()
+function fmt(iso: string | null): string {
+  return iso === null ? '—' : new Date(iso).toLocaleString()
 }
 
 async function load(): Promise<void> {

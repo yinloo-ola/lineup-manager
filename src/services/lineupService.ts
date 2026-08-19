@@ -5,6 +5,7 @@ import { buildMatchRows, type MatchRow } from '@/domain/matchesDashboard'
 import { fetchAdminScopeData, parseStatus } from '@/services/adminScope'
 import { emptyLineupFor } from '@/domain/lineupBuilder'
 import { parseTieFormat } from '@/domain/tieFormat'
+import { sideDisplayName } from '@/domain/teamNames'
 import { loadTieFormat } from '@/services/tieFormatService'
 import type { Lineup, LineupStatus, Player, Tie, TieFormat } from '@/domain/types'
 
@@ -20,12 +21,12 @@ interface LineupRow {
 interface TieRow {
   id: string
   category_id: string
-  scheduled_start: string
+  scheduled_start: string | null
   table_label: string | null
   group_label: string | null
   round_label: string | null
-  team_a: string
-  team_b: string
+  team_a: string | null
+  team_b: string | null
   tournament_id: string
 }
 interface PlayerRow {
@@ -68,7 +69,7 @@ export interface LineupBuilderData {
   categoryId: string
   /** The tie's tournament — callers pass it back on save/submit (writes stamp it). */
   tournamentId: string
-  opponentTeamId: string
+  opponentTeamId: string | null
   opponentName: string
   myTeamName: string
   tieFormat: TieFormat
@@ -78,7 +79,7 @@ export interface LineupBuilderData {
   teamTies: Tie[]
   teamLineups: Lineup[]
   asOf: string
-  cutoff: string
+  cutoff: string | null
   locked: boolean
 }
 
@@ -196,14 +197,14 @@ export async function fetchLineupBuilderData(
   check(tourRes.error)
   const tournamentStart =
     (tourRes.data as { start_date: string | null } | null)?.start_date ?? null
-  const asOf = resolveAsOf(tournamentStart, tie.scheduledStart)
+  const asOf = resolveAsOf(tournamentStart, tie.scheduledStart ?? undefined)
 
   return {
     tie,
     categoryId: tieRow.category_id,
     tournamentId: tieRow.tournament_id,
     opponentTeamId,
-    opponentName: teamNameById.get(opponentTeamId) ?? opponentTeamId,
+    opponentName: sideDisplayName(opponentTeamId, teamNameById),
     myTeamName: teamNameById.get(teamId) ?? teamId,
     tieFormat,
     roster,

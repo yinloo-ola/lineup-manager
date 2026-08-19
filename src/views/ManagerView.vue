@@ -19,8 +19,8 @@ const STATUS_COLORS: Record<string, string> = {
 function statusColor(s: string): string {
   return STATUS_COLORS[s] ?? 'grey'
 }
-function fmt(iso: string): string {
-  return new Date(iso).toLocaleString()
+function fmt(iso: string | null): string {
+  return iso === null ? '—' : new Date(iso).toLocaleString()
 }
 
 async function load() {

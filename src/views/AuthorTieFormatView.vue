@@ -214,8 +214,8 @@ async function doSave(fmt: TieFormat): Promise<void> {
   }
 }
 
-function formatScheduledStart(iso: string): string {
-  return new Date(iso).toLocaleString()
+function formatScheduledStart(iso: string | null): string {
+  return iso === null ? '—' : new Date(iso).toLocaleString()
 }
 </script>
 

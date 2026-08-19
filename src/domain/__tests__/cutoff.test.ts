@@ -38,3 +38,13 @@ describe('isLocked', () => {
     expect(isLocked(cutoff, '2026-08-13T14:00:00.001Z')).toBe(true)
   })
 })
+
+describe('knockout null schedule (ko-import #12)', () => {
+  it('computeCutoff yields null for an unscheduled slot', () => {
+    expect(computeCutoff(null, 30)).toBeNull()
+  })
+
+  it('isLocked is false for a null cutoff — an unscheduled slot never locks', () => {
+    expect(isLocked(null, '2099-01-01T00:00:00Z')).toBe(false)
+  })
+})

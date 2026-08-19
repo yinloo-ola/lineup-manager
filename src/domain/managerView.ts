@@ -1,20 +1,23 @@
 import { computeCutoff, isLocked } from './cutoff'
 import type { LineupStatus } from './types'
+import { sideDisplayName } from './teamNames'
 
 /** A tie as seen by the manager view (carries the category for cutoff lookup). */
 export interface ManagerTieInput {
   id: string
   categoryId: string
-  scheduledStart: string
-  teamIds: [string, string]
+  /** Null = an unscheduled knockout slot. */
+  scheduledStart: string | null
+  /** Null side = TBD (knockout). */
+  teamIds: [string | null, string | null]
 }
 
 export interface ManagerTieRow {
   tieId: string
-  opponentTeamId: string
+  opponentTeamId: string | null
   opponentName: string
-  scheduledStart: string
-  cutoff: string
+  scheduledStart: string | null
+  cutoff: string | null
   locked: boolean
   status: LineupStatus
 }
@@ -50,7 +53,7 @@ export function buildManagerTieRows(args: BuildManagerTieRowsArgs): ManagerTieRo
     rows.push({
       tieId: tie.id,
       opponentTeamId,
-      opponentName: teamNameById.get(opponentTeamId) ?? opponentTeamId,
+      opponentName: sideDisplayName(opponentTeamId, teamNameById),
       scheduledStart: tie.scheduledStart,
       cutoff,
       locked: isLocked(cutoff, now),
