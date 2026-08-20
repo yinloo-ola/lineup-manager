@@ -2,11 +2,13 @@
 // The Matches dashboard (spec §5 / ticket #14) — the screen the administrator
 // runs a tournament day from. One row per team match, each team's lineup
 // status inline in the on-screen vocabulary; chasing is visibility-only.
+// The Team event selector separates rows by event, mirroring the Bracket tab.
 import { computed, onMounted, ref, watch } from 'vue'
 import { useTournamentStore } from '@/stores/tournament'
 import { supabase } from '@/lib/supabase'
 import { fetchMatches } from '@/services/lineupService'
 import {
+  matchMatchesEvent,
   matchMatchesFilter,
   matchMissesCutoff,
   type MatchFilter,
@@ -20,6 +22,19 @@ const errorMessage = ref<string | null>(null)
 const filter = ref<MatchFilter>('all')
 const selected = ref<MatchRow | null>(null)
 
+interface CategoryOption {
+  id: string
+  name: string
+}
+const categories = ref<CategoryOption[]>([])
+/** Null = All team events (the default — the cross-event overview stands). */
+const categoryId = ref<string | null>(null)
+
+const eventOptions = computed<{ id: string | null; name: string }[]>(() => [
+  { id: null, name: 'All team events' },
+  ...categories.value
+])
+
 const FILTERS: { value: MatchFilter; label: string }[] = [
   { value: 'all', label: 'All' },
   { value: 'not-submitted', label: 'Not submitted' },
@@ -28,7 +43,7 @@ const FILTERS: { value: MatchFilter; label: string }[] = [
 ]
 
 const filtered = computed(() =>
-  matches.value.filter((m) => matchMatchesFilter(m, filter.value))
+  matches.value.filter((m) => matchMatchesEvent(m, categoryId.value) && matchMatchesFilter(m, filter.value))
 )
 
 function fmt(iso: string | null): string {
@@ -59,10 +74,36 @@ async function load(): Promise<void> {
   }
 }
 
-// Re-scope when the administrator switches tournament.
-watch(() => tournaments.activeId, load)
+/** The event selector's list — same source and ordering as the Bracket tab. */
+async function loadCategories(): Promise<void> {
+  if (!tournaments.activeId) {
+    categories.value = []
+    return
+  }
+  const { data, error } = await supabase
+    .from('categories')
+    .select('id, name')
+    .eq('tournament_id', tournaments.activeId)
+    .order('name')
+  if (error) {
+    errorMessage.value = error.message
+    return
+  }
+  categories.value = (data as CategoryOption[] | null) ?? []
+}
 
-onMounted(load)
+// Re-scope when the administrator switches tournament. The event selection
+// belongs to the old tournament, so it resets to All team events.
+watch(() => tournaments.activeId, async () => {
+  categoryId.value = null
+  await loadCategories()
+  await load()
+})
+
+onMounted(async () => {
+  await loadCategories()
+  await load()
+})
 </script>
 
 <template>
@@ -72,11 +113,23 @@ onMounted(load)
     </v-alert>
 
     <template v-if="matches.length">
-      <v-btn-toggle v-model="filter" mandatory color="primary" density="comfortable" class="mt-4">
-        <v-btn v-for="f in FILTERS" :key="f.value" :value="f.value" size="small">
-          {{ f.label }}
-        </v-btn>
-      </v-btn-toggle>
+      <div class="d-flex align-center ga-4 mt-4 flex-wrap">
+        <v-select
+          v-model="categoryId"
+          :items="eventOptions"
+          item-title="name"
+          item-value="id"
+          label="Team event"
+          density="compact"
+          hide-details
+          style="max-width: 280px"
+        />
+        <v-btn-toggle v-model="filter" mandatory color="primary" density="comfortable">
+          <v-btn v-for="f in FILTERS" :key="f.value" :value="f.value" size="small">
+            {{ f.label }}
+          </v-btn>
+        </v-btn-toggle>
+      </div>
 
       <v-card elevation="2" rounded="lg" class="mt-4">
         <v-card-text>
@@ -84,6 +137,9 @@ onMounted(load)
             <thead>
               <tr>
                 <th>Scheduled</th>
+                <!-- Only when events are mixed — scoped to one event the column
+                     would repeat that event's name on every row. -->
+                <th v-if="categoryId === null">Team event</th>
                 <th>Table</th>
                 <th>Group · Round</th>
                 <th colspan="2">Teams</th>
@@ -102,6 +158,7 @@ onMounted(load)
                   {{ fmt(m.scheduledStart) }}
                   <v-chip v-if="m.locked" size="small" variant="outlined" class="ml-2">Locked</v-chip>
                 </td>
+                <td v-if="categoryId === null">{{ m.categoryName }}</td>
                 <td>{{ m.table ?? '—' }}</td>
                 <td>{{ groupRoundParts(m).join(' · ') || '—' }}</td>
                 <td v-for="s in m.sides" :key="s.teamId ?? 'tbd'">

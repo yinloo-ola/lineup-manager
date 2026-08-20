@@ -35,6 +35,8 @@ export interface MatchSide {
 export interface MatchRow {
   tieId: string
   categoryId: string
+  /** The event's display name (the All-team-events column / drill-in scope). */
+  categoryName: string
   /** True for knockout rows — the dashboard links them into the bracket view. */
   isKnockout: boolean
   /** Null = an unscheduled knockout slot (never locks). */
@@ -77,6 +79,11 @@ export function matchMatchesFilter(match: MatchRow, filter: MatchFilter): boolea
     case 'past-cutoff':
       return match.locked
   }
+}
+
+/** True when the row belongs to the selected team event (null = all events). */
+export function matchMatchesEvent(match: MatchRow, categoryId: string | null): boolean {
+  return categoryId === null || match.categoryId === categoryId
 }
 
 /** Ascending by scheduled time, then table number (numeric where both are;
@@ -167,6 +174,7 @@ export function buildMatchRows(args: BuildMatchRowsArgs): MatchRow[] {
     return {
       tieId: tie.tieId,
       categoryId: tie.categoryId,
+      categoryName: args.categoryNameById.get(tie.categoryId) ?? tie.categoryId,
       isKnockout: tie.isKnockout ?? false,
       scheduledStart: tie.scheduledStart,
       table: tie.table,
