@@ -28,7 +28,12 @@ async function onSignOut(): Promise<void> {
 </script>
 
 <template>
-  <v-layout>
+  <!-- full-height: the layout box must equal the viewport (App.vue's v-main is
+       flex-stretched to it) so the absolutely-positioned drawer and app bar are
+       bounded by it; otherwise the box collapses to content height and the
+       document scrolls as a whole. scrollable: the content main then owns its
+       vertical scrolling; the drawer's __content scrolls independently. -->
+  <v-layout full-height>
     <v-navigation-drawer permanent width="230">
       <div class="pa-3 text-subtitle-2 text-medium-emphasis">Lineup Manager</div>
       <div class="px-4 pt-2 text-overline text-medium-emphasis">Tournament</div>
@@ -90,7 +95,7 @@ async function onSignOut(): Promise<void> {
       </template>
     </v-app-bar>
 
-    <v-main>
+    <v-main scrollable>
       <router-view />
     </v-main>
   </v-layout>

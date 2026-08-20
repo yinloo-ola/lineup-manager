@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest'
 import {
   buildMatchRows,
   compareMatchRows,
+  matchMatchesEvent,
   matchMatchesFilter,
   matchMissesCutoff,
   mergeKnockoutForDashboard,
@@ -53,6 +54,7 @@ describe('buildMatchRows', () => {
     const rows = buildMatchRows(args({ lineups: [] }))
     expect(rows).toHaveLength(1)
     expect(rows[0].tieId).toBe('t1')
+    expect(rows[0].categoryName).toBe("Men's Team")
     expect(rows[0].sides.map((s) => s.teamName)).toEqual(['Alpha', 'Bravo'])
     expect(rows[0].sides.every((s) => s.status === 'not-submitted')).toBe(true)
   })
@@ -227,6 +229,30 @@ describe('matchMatchesFilter', () => {
     expect(matchMatchesFilter(open, 'past-cutoff')).toBe(false)
     expect(matchMatchesFilter(lockedBothMissing, 'past-cutoff')).toBe(true)
     expect(matchMatchesFilter(lockedBothSubmitted, 'past-cutoff')).toBe(true)
+  })
+})
+
+describe('matchMatchesEvent', () => {
+  const base = {
+    tieId: 't1',
+    scheduledStart: FUTURE,
+    cutoff: FUTURE,
+    locked: false,
+    categoryName: "Men's Team",
+    sides: [
+      { teamId: 'A', teamName: 'A', status: 'not-submitted' as const, needsAttention: false, players: null, submittedAt: null },
+      { teamId: 'B', teamName: 'B', status: 'not-submitted' as const, needsAttention: false, players: null, submittedAt: null }
+    ]
+  }
+
+  it('null selects every team event (the All team events default)', () => {
+    expect(matchMatchesEvent({ ...base, categoryId: 'cat-a' }, null)).toBe(true)
+    expect(matchMatchesEvent({ ...base, categoryId: 'cat-b' }, null)).toBe(true)
+  })
+
+  it('an event id selects only that event rows', () => {
+    expect(matchMatchesEvent({ ...base, categoryId: 'cat-a' }, 'cat-a')).toBe(true)
+    expect(matchMatchesEvent({ ...base, categoryId: 'cat-b' }, 'cat-a')).toBe(false)
   })
 })
 

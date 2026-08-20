@@ -101,6 +101,21 @@ test.describe('knockout bracket lifecycle (bracket view)', () => {
     // row shows its advanced winner) before further clicks.
     await expect(page.locator('tr').filter({ hasText: 'BYE — no schedule' }).first()).toContainText('Kilo')
 
+    // --- Un-pick a bye: a decided one-team slot must still correct (the guard
+    // once demanded both sides set, which locked the bye's team in for good).
+    const qf1Bye = page.locator('tr').filter({ hasText: 'BYE — no schedule' }).first()
+    await qf1Bye.getByRole('button', { name: 'Kilo', exact: true }).click()
+    await expect(page.getByText(/Cannot select winner/)).toHaveCount(0)
+    // The slot is undecided: the remove-team ✕ surfaces, and the derived SF
+    // side rewound — QF1's Kilo is the only Kilo button left on the page.
+    await expect(qf1Bye.getByRole('button', { name: /remove team/i })).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Kilo', exact: true })).toHaveCount(1)
+    // Re-advance: still balanced, and only Kilo's bye returned to pending
+    // (Lima's stayed decided), so a single bye goes back.
+    await page.getByRole('button', { name: /Advance 1 bye/ }).click()
+    // The derived SF side is back: QF1's Kilo plus SF1's advanced Kilo again.
+    await expect(page.getByRole('button', { name: 'Kilo', exact: true })).toHaveCount(2)
+
     // --- Winners: QF2 and QF3 decide, the semis fill, the Final derives.
     await rowWith(page, 'Mike', 'November').getByRole('button', { name: 'Mike' }).click()
     await rowWith(page, 'Oscar', 'Papa').getByRole('button', { name: 'Oscar' }).click()

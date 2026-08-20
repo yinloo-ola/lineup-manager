@@ -250,6 +250,32 @@ describe('winner toggle (spec §6)', () => {
     expect(canToggleWinner(snap, 's-qf2', 0)).toEqual({ ok: true, action: 'un-pick' })
     expect(canToggleWinner(snap, 's-qf2', 1)).toEqual({ ok: false, reason: 'winner-is-other-side' })
   })
+
+  it('un-picks a bye-advanced slot — decided with one team, nothing downstream', () => {
+    const rs = rows()
+    // Bye-advance wrote tA as s-qf1's winner; the opponent side never fills.
+    // tA sits derived in SF1, but no downstream winner/lineup → instant un-pick.
+    Object.assign(rs.find((r) => r.id === 's-qf1')!, { teamA: 'tA', winnerSide: 'a' })
+    const snap = buildBracketSnapshot(rs, [])
+    expect(canToggleWinner(snap, 's-qf1', 0)).toEqual({ ok: true, action: 'un-pick' })
+    expect(canToggleWinner(snap, 's-qf1', 1)).toEqual({ ok: false, reason: 'winner-is-other-side' })
+  })
+
+  it('un-picks a bye-advanced slot as a cascade when downstream moved', () => {
+    const rs = rows()
+    Object.assign(rs.find((r) => r.id === 's-qf1')!, { teamA: 'tA', winnerSide: 'a' })
+    // tA went on to win SF1 — correcting the bye must rewind through it.
+    Object.assign(rs.find((r) => r.id === 's-sf1')!, { winnerSide: 'a' })
+    const snap = buildBracketSnapshot(rs, [])
+    expect(canToggleWinner(snap, 's-qf1', 0)).toEqual({
+      ok: false, reason: 'needs-cascade', cascade: planCascade(snap, 's-qf1')
+    })
+  })
+
+  it('still refuses to PICK on a one-side-empty slot (the pick preconditions stand)', () => {
+    const snap = buildBracketSnapshot(rows(), [])
+    expect(canToggleWinner(snap, 's-qf1', 0)).toEqual({ ok: false, reason: 'sides-not-set' })
+  })
 })
 
 describe('cascade (spec §6: corrections cascade-clear behind a confirmation)', () => {
