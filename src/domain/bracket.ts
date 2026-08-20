@@ -318,20 +318,25 @@ export function canToggleWinner(
   if (row === undefined || !row.isKnockout) return { ok: false, reason: 'not-a-slot' }
   const slot = snap.slots.find((s) => s.id === slotId)
   if (slot === undefined) return { ok: false, reason: 'not-a-slot' }
+  // Un-pick comes first, free of the pick preconditions below: a bye-advanced
+  // slot is decided holding one team only, and its correction must stay
+  // reachable — gating un-pick on both sides set made that team unchangeable.
+  if (row.winnerSide !== null) {
+    if ((row.winnerSide === 'a' ? 0 : 1) !== side) {
+      return { ok: false, reason: 'winner-is-other-side' }
+    }
+    if (downstreamTouched(snap, slotId)) {
+      return { ok: false, reason: 'needs-cascade', cascade: planCascade(snap, slotId) }
+    }
+    return { ok: true, action: 'un-pick' }
+  }
   if (slot.teams[0] === null || slot.teams[1] === null) {
     return { ok: false, reason: 'sides-not-set' }
   }
   if (slot.isEntryRound && slot.placedMatchId === null) {
     return { ok: false, reason: 'not-placed' }
   }
-  if (row.winnerSide === null) return { ok: true, action: 'pick' }
-  if ((row.winnerSide === 'a' ? 0 : 1) !== side) {
-    return { ok: false, reason: 'winner-is-other-side' }
-  }
-  if (downstreamTouched(snap, slotId)) {
-    return { ok: false, reason: 'needs-cascade', cascade: planCascade(snap, slotId) }
-  }
-  return { ok: true, action: 'un-pick' }
+  return { ok: true, action: 'pick' }
 }
 
 // ---------------------------------------------------------------------------
