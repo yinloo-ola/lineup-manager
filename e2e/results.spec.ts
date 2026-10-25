@@ -261,7 +261,8 @@ test.describe('results entry (feature acceptance)', () => {
         .getByRole('spinbutton', { name: `Rubber 1 game ${game + 1} side B` })
         .fill(String(b))
     }
-    await dlg.getByLabel('Rubber 1 side A player').selectOption({ label: 'Adam' })
+    await dlg.getByLabel('Rubber 1 side A player').click({ force: true })
+    await page.getByRole('option', { name: 'Adam', exact: true }).last().click()
     await dlg.getByRole('button', { name: /save results/i }).click()
     await expect(dlg).not.toBeVisible()
 

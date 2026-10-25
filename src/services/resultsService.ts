@@ -1,8 +1,17 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
-import { bothLineupsSubmitted, parseBestOf } from '@/domain/results'
+import { bothLineupsSubmitted, parseBestOf, type GameScore, type Side } from '@/domain/results'
 
 /** A typed guard rejection from the results entry path (mapped to UI toasts). */
 export class ResultEntryError extends Error {}
+
+/** One stored rubber result row, camelCase for the UI. */
+export interface StoredRubberResult {
+  rubberIndex: number
+  playerIds: [unknown, unknown]
+  games: GameScore[]
+  walkover: boolean
+  walkoverSide: Side | null
+}
 
 /**
  * Set a tie's best-of-games value (admin, per-tie override of the import
@@ -34,6 +43,7 @@ export async function saveRubberResult(
     playerIds: [unknown, unknown]
     games: unknown
     walkover: boolean
+    walkoverSide?: Side | null
   }
 ): Promise<void> {
   const tieRes = await client
@@ -73,9 +83,103 @@ export async function saveRubberResult(
       rubber_index: input.rubberIndex,
       player_ids: input.playerIds,
       games: input.games,
-      walkover: input.walkover
+      walkover: input.walkover,
+      walkover_side: input.walkover ? (input.walkoverSide ?? null) : null
     },
     { onConflict: 'tie_id,rubber_index' }
   )
   if (error) throw error
+}
+
+/**
+ * Everything the admin results dialog needs for one tournament's group ties:
+ * per tie — best-of, rubber count, the submitted-lineups player prefill (per
+ * rubber, per side) and the stored results. Loaded in one go when the
+ * dashboard mounts so opening a dialog is instant.
+ */
+export interface TieResultContext {
+  tieId: string
+  teamIds: [string | null, string | null]
+  bestOf: number
+  rubberCount: number
+  /** Submitted-lineup player ids per rubber per side (null slot = none). */
+  prefill: [((string[] | null) | undefined)[], ((string[] | null) | undefined)[]]
+  stored: StoredRubberResult[]
+}
+
+export async function loadTieResultContexts(
+  client: SupabaseClient,
+  tournamentId: string
+): Promise<Map<string, TieResultContext>> {
+  const [tiesRes, lineupsRes, formatsRes, resultsRes] = await Promise.all([
+    client
+      .from('ties')
+      .select('id, team_a, team_b, is_knockout, category_id, best_of')
+      .eq('tournament_id', tournamentId),
+    client
+      .from('lineups')
+      .select('tie_id, team_id, status, player_ids')
+      .eq('tournament_id', tournamentId),
+    client.from('tie_formats').select('category_id, rubbers').eq('tournament_id', tournamentId),
+    client
+      .from('rubber_results')
+      .select('tie_id, rubber_index, player_ids, games, walkover, walkover_side')
+      .eq('tournament_id', tournamentId)
+  ])
+  for (const r of [tiesRes, lineupsRes, formatsRes, resultsRes]) {
+    if (r.error) throw r.error
+  }
+
+  const rubberCountByCategory = new Map<string, number>()
+  for (const f of (formatsRes.data as { category_id: string; rubbers: unknown }[]) ?? []) {
+    if (Array.isArray(f.rubbers)) rubberCountByCategory.set(f.category_id, f.rubbers.length)
+  }
+
+  const prefillByTie = new Map<string, { a: (string[] | null)[]; b: (string[] | null)[] }>()
+  const teamByTie = new Map<string, [string | null, string | null]>()
+  for (const t of (tiesRes.data as Record<string, unknown>[]) ?? []) {
+    teamByTie.set(t.id as string, [t.team_a as string | null, t.team_b as string | null])
+  }
+  for (const l of (lineupsRes.data as Record<string, unknown>[]) ?? []) {
+    if (l.status !== 'submitted') continue
+    const tieId = l.tie_id as string
+    const teams = teamByTie.get(tieId)
+    if (!teams) continue
+    const side = l.team_id === teams[0] ? 'a' : l.team_id === teams[1] ? 'b' : null
+    if (side === null) continue
+    const entry = prefillByTie.get(tieId) ?? { a: [], b: [] }
+    entry[side] = (l.player_ids as (string[] | null)[]) ?? []
+    prefillByTie.set(tieId, entry)
+  }
+
+  const storedByTie = new Map<string, StoredRubberResult[]>()
+  for (const r of (resultsRes.data as Record<string, unknown>[]) ?? []) {
+    const tieId = r.tie_id as string
+    const arr = storedByTie.get(tieId) ?? []
+    arr[(r.rubber_index as number) - 1] = {
+      rubberIndex: r.rubber_index as number,
+      playerIds: (r.player_ids as [unknown, unknown]) ?? [null, null],
+      games: (r.games as GameScore[]) ?? [],
+      walkover: (r.walkover as boolean) ?? false,
+      walkoverSide: (r.walkover_side as Side | null) ?? null
+    }
+    storedByTie.set(tieId, arr)
+  }
+
+  const byTie = new Map<string, TieResultContext>()
+  for (const t of (tiesRes.data as Record<string, unknown>[]) ?? []) {
+    const tieId = t.id as string
+    if (t.is_knockout) continue // knockout entry arrives in slice 3
+    const rubberCount = rubberCountByCategory.get(t.category_id as string) ?? 0
+    const prefill = prefillByTie.get(tieId) ?? { a: [], b: [] }
+    byTie.set(tieId, {
+      tieId,
+      teamIds: [t.team_a as string | null, t.team_b as string | null],
+      bestOf: (t.best_of as number | null) ?? 5,
+      rubberCount,
+      prefill: [prefill.a, prefill.b],
+      stored: storedByTie.get(tieId) ?? []
+    })
+  }
+  return byTie
 }

@@ -7,7 +7,13 @@ import { computed, onMounted, ref, watch } from 'vue'
 import { useTournamentStore } from '@/stores/tournament'
 import { supabase } from '@/lib/supabase'
 import { fetchMatches } from '@/services/lineupService'
-import { setTieBestOf } from '@/services/resultsService'
+import {
+  loadTieResultContexts,
+  setTieBestOf,
+  type TieResultContext
+} from '@/services/resultsService'
+import { fetchAdminScopeData } from '@/services/adminScope'
+import AdminResultsDialog from '@/components/AdminResultsDialog.vue'
 import {
   matchMatchesEvent,
   matchMatchesFilter,
@@ -51,6 +57,39 @@ async function saveBestOf(): Promise<void> {
   } finally {
     bestOfBusy.value = false
   }
+}
+
+// --- the admin results dialog (results slice R6) ---
+interface PlayerOption {
+  id: string
+  name: string
+}
+const resultContexts = ref<Map<string, TieResultContext>>(new Map())
+const rosterByTeam = ref<Map<string, PlayerOption[]>>(new Map())
+const resultsTie = ref<MatchRow | null>(null)
+const resultsOpen = ref(false)
+
+/** Group ties with both teams known — knockout entry arrives in slice 3. */
+const resultsEligible = (m: MatchRow): boolean =>
+  !m.isKnockout && m.sides.every((s) => s.teamId !== null)
+
+function openResults(m: MatchRow): void {
+  resultsTie.value = m
+  resultsOpen.value = true
+}
+
+async function loadResultsSupport(): Promise<void> {
+  if (!tournaments.activeId) return
+  const [ctxs, scope] = await Promise.all([
+    loadTieResultContexts(supabase, tournaments.activeId),
+    fetchAdminScopeData(supabase, tournaments.activeId)
+  ])
+  resultContexts.value = ctxs
+  rosterByTeam.value = scope.rosterByTeam as unknown as Map<string, PlayerOption[]>
+}
+
+async function onResultsSaved(): Promise<void> {
+  await Promise.all([load(), loadResultsSupport()])
 }
 
 interface CategoryOption {
@@ -134,6 +173,9 @@ watch(() => tournaments.activeId, async () => {
 onMounted(async () => {
   await loadCategories()
   await load()
+  await loadResultsSupport().catch((e) => {
+    errorMessage.value = (e as Error).message
+  })
 })
 </script>
 
@@ -206,6 +248,14 @@ onMounted(async () => {
                     @click.stop
                     :to="{ name: 'bracket', params: { categoryId: m.categoryId } }"
                   >Bracket</v-btn>
+                  <v-btn
+                    v-if="resultsEligible(m)"
+                    size="x-small"
+                    variant="tonal"
+                    color="primary"
+                    class="ml-1"
+                    @click.stop="openResults(m)"
+                  >Results</v-btn>
                 </td>
               </tr>
             </tbody>
@@ -319,6 +369,17 @@ onMounted(async () => {
         </v-card-actions>
       </v-card>
     </v-dialog>
+
+    <AdminResultsDialog
+      v-model="resultsOpen"
+      :tie-id="resultsTie?.tieId ?? ''"
+      :team-a-name="resultsTie?.sides[0].teamName ?? ''"
+      :team-b-name="resultsTie?.sides[1].teamName ?? ''"
+      :context="resultsTie ? resultContexts.get(resultsTie.tieId) ?? null : null"
+      :roster-a="resultsTie?.sides[0].teamId ? rosterByTeam.get(resultsTie.sides[0].teamId) ?? [] : []"
+      :roster-b="resultsTie?.sides[1].teamId ? rosterByTeam.get(resultsTie.sides[1].teamId) ?? [] : []"
+      @saved="onResultsSaved"
+    />
   </v-container>
 </template>
 
