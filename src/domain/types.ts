@@ -107,6 +107,11 @@ export type ViolationKind =
   | 'within-tie-overuse'
   | 'cross-slot-double-book'
   | 'malformed'
+  // Results entry (results-and-standings slice 1).
+  | 'best-of-overflow'
+  | 'bad-score'
+  | 'walkover-with-games'
+  | 'walkover-no-side'
 
 /** A single problem found when validating a Lineup. */
 export interface Violation {

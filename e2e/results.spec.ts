@@ -235,6 +235,8 @@ test.describe('results entry (feature acceptance)', () => {
     await expect(page.getByText(/Decided · Alpha/).first()).toBeVisible()
 
     // Admin override: flip r1's games to Charlie and swap r1 side A's player.
+    // The umpire's session would redirect /login back to /umpire — drop it.
+    await page.evaluate(() => localStorage.clear())
     await page.goto('/login')
     await page.getByRole('textbox', { name: /email/i }).fill(TEST_ADMIN_EMAIL)
     await page.getByRole('textbox', { name: /password/i }).fill(TEST_ADMIN_PASSWORD)
