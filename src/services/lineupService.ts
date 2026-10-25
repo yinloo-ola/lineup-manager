@@ -3,6 +3,7 @@ import { resolveAsOf } from '@/domain/age'
 import { computeCutoff, isLocked } from '@/domain/cutoff'
 import { buildMatchRows, type MatchRow } from '@/domain/matchesDashboard'
 import { fetchAdminScopeData, parseStatus } from '@/services/adminScope'
+import { loadTieResultContexts } from '@/services/resultsService'
 import { emptyLineupFor } from '@/domain/lineupBuilder'
 import { parseTieFormat } from '@/domain/tieFormat'
 import { sideDisplayName } from '@/domain/teamNames'
@@ -275,6 +276,21 @@ export async function fetchMatches(
   client: SupabaseClient,
   tournamentId: string
 ): Promise<MatchRow[]> {
-  const scope = await fetchAdminScopeData(client, tournamentId)
-  return buildMatchRows({ ...scope, now: new Date().toISOString() })
+  const [scope, resultContexts] = await Promise.all([
+    fetchAdminScopeData(client, tournamentId),
+    loadTieResultContexts(client, tournamentId)
+  ])
+  return buildMatchRows({
+    ...scope,
+    now: new Date().toISOString(),
+    results: [...resultContexts.values()].flatMap((c) =>
+      c.stored.map((s) => ({
+        tieId: c.tieId,
+        rubberIndex: s.rubberIndex,
+        games: s.games,
+        walkover: s.walkover,
+        walkoverSide: s.walkoverSide
+      }))
+    )
+  })
 }

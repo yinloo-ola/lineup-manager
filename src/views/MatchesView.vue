@@ -216,6 +216,7 @@ onMounted(async () => {
                 <th>Table</th>
                 <th>Group · Round</th>
                 <th colspan="2">Teams</th>
+                <th>Result</th>
                 <th></th>
               </tr>
             </thead>
@@ -239,6 +240,14 @@ onMounted(async () => {
                     <span>{{ s.teamName }}</span>
                     <MatchStatusChips :side="s" />
                   </div>
+                </td>
+                <td>
+                  <span v-if="m.resultState === 'decided'" class="text-body-2">
+                    Decided · {{ m.winnerName }}
+                  </span>
+                  <span v-else-if="m.resultState === 'partial'" class="text-body-2 text-medium-emphasis">
+                    Partly entered
+                  </span>
                 </td>
                 <td>
                   <v-btn

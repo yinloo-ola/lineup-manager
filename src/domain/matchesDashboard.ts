@@ -12,10 +12,23 @@ import {
   type BuildAdminLineupRowsArgs
 } from './adminView'
 import { computeCutoff, isLocked } from './cutoff'
+import { rubberWinner, tieWinner, type GameScore, type Side } from './results'
 import type { LineupStatus } from './types'
 import { sideDisplayName } from './teamNames'
 
-export type BuildMatchRowsArgs = BuildAdminLineupRowsArgs
+export type BuildMatchRowsArgs = BuildAdminLineupRowsArgs & {
+  /** Stored rubber results — winners are derived here, never read back from a tie. */
+  results?: DashboardResultInput[]
+}
+
+/** One stored rubber result, as the dashboard derivation consumes it. */
+export interface DashboardResultInput {
+  tieId: string
+  rubberIndex: number
+  games: GameScore[]
+  walkover: boolean
+  walkoverSide: Side | null
+}
 
 /** A team's lineup status for one team match, in the on-screen vocabulary. */
 export type SideStatus = 'submitted' | 'not-submitted' | 'missed-cutoff'
@@ -51,6 +64,10 @@ export interface MatchRow {
   sides: [MatchSide, MatchSide]
   cutoff: string | null
   locked: boolean
+  /** Derived from stored results (results slice R7) — undefined when untouched. */
+  resultState?: 'partial' | 'decided'
+  /** The derived winner's display name once decided. */
+  winnerName?: string
 }
 
 export type MatchFilter = 'all' | 'not-submitted' | 'submitted' | 'past-cutoff'
@@ -134,6 +151,13 @@ export function buildMatchRows(args: BuildMatchRowsArgs): MatchRow[] {
   const validated: AdminLineupRow[] = buildAdminLineupRows({ ...args, lineups })
   const rowByTeam = new Map(validated.map((r) => [`${r.tieId}:${r.teamId}`, r]))
 
+  const resultsByTie = new Map<string, DashboardResultInput[]>()
+  for (const r of args.results ?? []) {
+    const arr = resultsByTie.get(r.tieId) ?? []
+    arr.push(r)
+    resultsByTie.set(r.tieId, arr)
+  }
+
   const matches: MatchRow[] = ties.map((tie) => {
     // Every side of a tie shares its cutoff/locked state — computed here so a
     // tie with no lineups at all still filters and chips correctly.
@@ -185,9 +209,42 @@ export function buildMatchRows(args: BuildMatchRowsArgs): MatchRow[] {
       bestOf: tie.bestOf,
       sides: [sides[0], sides[1]],
       cutoff,
-      locked
+      locked,
+      ...deriveResultState(
+        tie,
+        resultsByTie.get(tie.tieId) ?? [],
+        args.formatByCategory.get(tie.categoryId)?.rubbers.length ?? 0,
+        teamNameById
+      )
     }
   })
 
   return matches.sort(compareMatchRows)
+}
+
+/**
+ * The dashboard's derived result state (results slice R7): computed from the
+ * stored rubber results every time rows build — nothing about winners is ever
+ * written to the tie. Pure.
+ */
+function deriveResultState(
+  tie: AdminTieInput,
+  results: DashboardResultInput[],
+  rubberCount: number,
+  teamNameById: Map<string, string>
+): Pick<MatchRow, 'resultState' | 'winnerName'> {
+  if (results.length === 0 || (tie.isKnockout ?? false)) return {}
+  if (tie.teamIds[0] === null || tie.teamIds[1] === null) return {}
+  const bestOf = tie.bestOf ?? 5
+  if (rubberCount === 0) return {}
+  const entered = [...results].sort((a, b) => a.rubberIndex - b.rubberIndex)
+  const winners = entered.map((r) =>
+    rubberWinner(r.games, bestOf, r.walkover, r.walkoverSide ?? 'a')
+  )
+  const winner = tieWinner(winners, rubberCount)
+  if (winner === null) return { resultState: 'partial' }
+  return {
+    resultState: 'decided',
+    winnerName: sideDisplayName(winner === 'a' ? tie.teamIds[0] : tie.teamIds[1], teamNameById)
+  }
 }

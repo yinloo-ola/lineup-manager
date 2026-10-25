@@ -15,6 +15,13 @@ const NOW = '2026-06-01T12:00:00Z'
 const FUTURE = '2099-01-01T10:00:00Z'
 const PAST = '2000-01-01T10:00:00Z'
 const mensSingles: TieFormat = { rubbers: [{ format: 'singles', constraint: { allowedGenders: ['M'] } }] }
+const threeRubbers: TieFormat = {
+  rubbers: [
+    { format: 'singles', constraint: { allowedGenders: ['M'] } },
+    { format: 'singles', constraint: { allowedGenders: ['M'] } },
+    { format: 'singles', constraint: { allowedGenders: ['M'] } }
+  ]
+}
 const male = (id: string): Player => ({ id, name: id.toUpperCase(), gender: 'M', dateOfBirth: '1990-01-01' })
 const female = (id: string): Player => ({ id, name: id.toUpperCase(), gender: 'F', dateOfBirth: '1990-01-01' })
 
@@ -57,6 +64,80 @@ describe('buildMatchRows', () => {
     expect(rows[0].categoryName).toBe("Men's Team")
     expect(rows[0].sides.map((s) => s.teamName)).toEqual(['Alpha', 'Bravo'])
     expect(rows[0].sides.every((s) => s.status === 'not-submitted')).toBe(true)
+  })
+
+  it('derives the result state from entered rubbers without storing anything', () => {
+    // Best-of-5 games, 3 rubbers in the format: Alpha wins r1, walkover a on
+    // r2 → decided for Alpha; nothing is written back to the tie.
+    const rows = buildMatchRows(
+      args({
+        ties: [{ ...tie(), bestOf: 5 }],
+        formatByCategory: new Map([['cat', threeRubbers]]),
+        results: [
+          {
+            tieId: 't1',
+            rubberIndex: 1,
+            games: [
+              { a: 11, b: 5 },
+              { a: 11, b: 7 },
+              { a: 11, b: 9 }
+            ],
+            walkover: false,
+            walkoverSide: null
+          },
+          { tieId: 't1', rubberIndex: 2, games: [], walkover: true, walkoverSide: 'a' }
+        ]
+      })
+    )
+    expect(rows[0].resultState).toBe('decided')
+    expect(rows[0].winnerName).toBe('Alpha')
+  })
+
+  it('shows partial when rubbers are entered but the tie is undecided', () => {
+    const rows = buildMatchRows(
+      args({
+        formatByCategory: new Map([['cat', threeRubbers]]),
+        results: [
+          {
+            tieId: 't1',
+            rubberIndex: 1,
+            games: [
+              { a: 11, b: 5 },
+              { a: 11, b: 7 },
+              { a: 11, b: 9 }
+            ],
+            walkover: false,
+            walkoverSide: null
+          }
+        ]
+      })
+    )
+    expect(rows[0].resultState).toBe('partial')
+    expect(rows[0].winnerName).toBeUndefined()
+  })
+
+  it('a decided flip recomputes: the winner follows the edited rubbers', () => {
+    const rows = buildMatchRows(
+      args({
+        formatByCategory: new Map([['cat', threeRubbers]]),
+        results: [
+          {
+            tieId: 't1',
+            rubberIndex: 1,
+            games: [
+              { a: 5, b: 11 },
+              { a: 7, b: 11 },
+              { a: 9, b: 11 }
+            ],
+            walkover: false,
+            walkoverSide: null
+          },
+          { tieId: 't1', rubberIndex: 2, games: [], walkover: true, walkoverSide: 'a' }
+        ]
+      })
+    )
+    // 1–1 in a 3-rubber format → undecided, not a stored winner.
+    expect(rows[0].resultState).toBe('partial')
   })
 
   it('derives Submitted for a valid submitted lineup and Not submitted for the rest', () => {
