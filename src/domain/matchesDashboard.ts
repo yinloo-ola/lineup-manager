@@ -45,6 +45,8 @@ export interface MatchRow {
   table?: string
   group?: string
   round?: string
+  /** Best-of-games per rubber (results slice R1); undefined = the default 5. */
+  bestOf?: number
   /** Aligned to the tie's teamIds. */
   sides: [MatchSide, MatchSide]
   cutoff: string | null
@@ -180,6 +182,7 @@ export function buildMatchRows(args: BuildMatchRowsArgs): MatchRow[] {
       table: tie.table,
       group: tie.group,
       round: tie.round,
+      bestOf: tie.bestOf,
       sides: [sides[0], sides[1]],
       cutoff,
       locked

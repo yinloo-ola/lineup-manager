@@ -7,6 +7,7 @@ import { computed, onMounted, ref, watch } from 'vue'
 import { useTournamentStore } from '@/stores/tournament'
 import { supabase } from '@/lib/supabase'
 import { fetchMatches } from '@/services/lineupService'
+import { setTieBestOf } from '@/services/resultsService'
 import {
   matchMatchesEvent,
   matchMatchesFilter,
@@ -21,6 +22,36 @@ const matches = ref<MatchRow[]>([])
 const errorMessage = ref<string | null>(null)
 const filter = ref<MatchFilter>('all')
 const selected = ref<MatchRow | null>(null)
+
+// Per-tie best-of editor (results slice R1): staged in the detail dialog,
+// saved through the service; even/non-positive values surface as an error.
+const bestOfDraft = ref<string>('')
+const bestOfBusy = ref(false)
+const bestOfError = ref<string | null>(null)
+const bestOfSaved = ref(false)
+
+watch(selected, (m) => {
+  bestOfError.value = null
+  bestOfSaved.value = false
+  bestOfDraft.value = m ? String(m.bestOf ?? 5) : ''
+})
+
+async function saveBestOf(): Promise<void> {
+  if (!selected.value) return
+  bestOfBusy.value = true
+  bestOfError.value = null
+  bestOfSaved.value = false
+  try {
+    await setTieBestOf(supabase, selected.value.tieId, bestOfDraft.value)
+    selected.value = { ...selected.value, bestOf: Number(bestOfDraft.value) }
+    bestOfSaved.value = true
+    await load()
+  } catch (e) {
+    bestOfError.value = (e as Error).message
+  } finally {
+    bestOfBusy.value = false
+  }
+}
 
 interface CategoryOption {
   id: string
@@ -196,6 +227,47 @@ onMounted(async () => {
           <v-card-subtitle>{{ metadata(selected) }}</v-card-subtitle>
         </v-card-item>
         <v-card-text>
+          <v-row>
+            <v-col cols="12" md="4">
+              <v-text-field
+                v-model="bestOfDraft"
+                type="number"
+                label="Best of (games per match)"
+                density="compact"
+                hint="Positive odd number — 5 is the default"
+                persistent-hint
+                style="max-width: 240px"
+              />
+              <v-btn
+                class="mt-2"
+                size="small"
+                variant="tonal"
+                color="primary"
+                :loading="bestOfBusy"
+                @click="saveBestOf"
+              >
+                Save best of
+              </v-btn>
+              <v-alert
+                v-if="bestOfError"
+                type="error"
+                variant="tonal"
+                density="compact"
+                class="mt-2"
+              >
+                {{ bestOfError }}
+              </v-alert>
+              <v-alert
+                v-if="bestOfSaved"
+                type="success"
+                variant="tonal"
+                density="compact"
+                class="mt-2"
+              >
+                Best of saved.
+              </v-alert>
+            </v-col>
+          </v-row>
           <v-row>
             <v-col v-for="s in selected.sides" :key="s.teamId ?? 'tbd'" cols="12" md="6">
               <v-card variant="outlined" rounded="lg">

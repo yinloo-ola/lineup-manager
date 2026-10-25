@@ -34,6 +34,8 @@ export interface AdminTieInput {
   isKnockout?: boolean
   /** On a placed entry slot: the pool match bound to it. */
   placedMatchId?: string | null
+  /** Best-of-games per rubber (results slice R1); undefined = the default 5. */
+  bestOf?: number
 }
 
 export interface AdminLineupRow extends AdminLineupInput {
