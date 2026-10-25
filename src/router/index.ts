@@ -75,6 +75,11 @@ const router = createRouter({
       component: () => import('@/views/LineupBuilderView.vue')
     },
     {
+      path: '/umpire',
+      name: 'umpire',
+      component: () => import('@/views/UmpireView.vue')
+    },
+    {
       path: '/change-password',
       name: 'change-password',
       component: () => import('@/views/ChangePasswordView.vue')
@@ -100,7 +105,9 @@ router.beforeEach(async (to) => {
         ? 'change-password'
         : auth.isManager
           ? 'manager'
-          : landingName()
+          : auth.isUmpire
+            ? 'umpire'
+            : landingName()
     }
   }
 
@@ -109,6 +116,12 @@ router.beforeEach(async (to) => {
   }
 
   if (auth.isAuthenticated && !auth.mustChangePassword) {
+    // An umpire-only account lives on /umpire — admin pages, the manager home
+    // and the lineup builder are out of their lane. (An admin with an umpires
+    // row keeps their admin landing; the umpire page stays reachable.)
+    if (auth.isUmpire && !auth.isAdmin && (to.name === 'home' || to.meta.adminOnly || to.name === 'manager' || to.name === 'lineup-builder')) {
+      return { name: 'umpire' }
+    }
     if (auth.isManager && (to.name === 'home' || to.meta.adminOnly)) return { name: 'manager' }
     if (!auth.isManager && (to.name === 'home' || to.name === 'manager')) {
       return { name: landingName() }

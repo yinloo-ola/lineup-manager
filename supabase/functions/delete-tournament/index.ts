@@ -69,9 +69,10 @@ Deno.serve(async (req: Request): Promise<Response> => {
     .maybeSingle();
   if (!tour) return json({ error: "Tournament not found" }, 404);
 
-  // Gather the manager auth user_ids for this tournament's teams. Read them
-  // BEFORE deleting anything: once the tournament (and its teams) are gone the
-  // team_managers rows cascade away and we'd lose the mapping to the accounts.
+  // Gather the manager auth user_ids for this tournament's teams, plus the
+  // umpires bound directly to the tournament. Read them BEFORE deleting
+  // anything: once the tournament (and its teams) are gone the team_managers /
+  // umpires rows cascade away and we'd lose the mapping to the accounts.
   const { data: teams } = await admin
     .from("teams")
     .select("id")
@@ -87,8 +88,15 @@ Deno.serve(async (req: Request): Promise<Response> => {
       if (m.user_id) userIds.push(m.user_id);
     }
   }
+  const { data: umpires } = await admin
+    .from("umpires")
+    .select("user_id")
+    .eq("tournament_id", tournamentId);
+  for (const u of (umpires as { user_id: string }[] | null ?? [])) {
+    if (u.user_id) userIds.push(u.user_id);
+  }
 
-  // Remove each manager's auth account so they can no longer sign in. A "user
+  // Remove each provisioned account so they can no longer sign in. A "user
   // not found" error is treated as success — the account is already gone, which
   // is exactly the desired end state (idempotent on re-tries). Any other error
   // aborts BEFORE the tournament is touched, leaving the rows intact so the
@@ -97,14 +105,15 @@ Deno.serve(async (req: Request): Promise<Response> => {
     const { error: delErr } = await admin.auth.admin.deleteUser(userId);
     if (delErr && !/not found/i.test(delErr.message)) {
       return json(
-        { error: `Failed to remove manager account: ${delErr.message}`, userId },
+        { error: `Failed to remove provisioned account: ${delErr.message}`, userId },
         500,
       );
     }
   }
 
   // Delete the tournament — on-delete cascades clear its categories, teams,
-  // players, ties, tie_formats and lineups (migration 0009).
+  // players, ties, tie_formats, lineups, umpires and rubber_results
+  // (migrations 0009 + 0016).
   const { error: delTourErr } = await admin
     .from("tournaments")
     .delete()

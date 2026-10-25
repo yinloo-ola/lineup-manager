@@ -6,25 +6,29 @@ import { useTournamentStore } from '@/stores/tournament'
 
 // Authentication store (Pinia, setup style). Backed by Supabase Auth.
 //
-// Managers are bound 1:1 to a team via the team_managers table; on login we load
-// that profile to drive the forced first-login password change. Administrators
-// have no team_managers row, so mustChangePassword stays false for them.
+// Managers are bound 1:1 to a team via the team_managers table; umpires are
+// bound to a tournament via the umpires table; on login we load those profiles
+// to drive the forced first-login password change and routing. Administrators
+// have neither row, so mustChangePassword stays false for them.
 export const useAuthStore = defineStore('auth', () => {
   const user = ref<User | null>(null)
   const loading = ref(true)
   const error = ref<string | null>(null)
   const mustChangePassword = ref(false)
   const teamId = ref<string | null>(null)
+  const umpireTournamentId = ref<string | null>(null)
   const isAdmin = ref(false)
 
   const isAuthenticated = computed(() => user.value !== null)
   const isManager = computed(() => teamId.value !== null)
+  const isUmpire = computed(() => umpireTournamentId.value !== null)
 
-  /** Load the signed-in user's manager profile (if any) + admin flag. */
+  /** Load the signed-in user's manager/umpire profile (if any) + admin flag. */
   async function loadProfile(): Promise<void> {
     if (!user.value) {
       mustChangePassword.value = false
       teamId.value = null
+      umpireTournamentId.value = null
       isAdmin.value = false
       return
     }
@@ -33,10 +37,15 @@ export const useAuthStore = defineStore('auth', () => {
     // we nulled teamId synchronously here, a concurrent navigation (right after
     // a password change) would read isManager as false and misroute a manager
     // to the admin home.
-    const [tm, adminRes] = await Promise.all([
+    const [tm, ump, adminRes] = await Promise.all([
       supabase
         .from('team_managers')
         .select('must_change_password, team_id')
+        .eq('user_id', user.value.id)
+        .maybeSingle(),
+      supabase
+        .from('umpires')
+        .select('must_change_password, tournament_id')
         .eq('user_id', user.value.id)
         .maybeSingle(),
       supabase.rpc('is_admin')
@@ -48,6 +57,12 @@ export const useAuthStore = defineStore('auth', () => {
     } else {
       mustChangePassword.value = false
       teamId.value = null
+    }
+    if (ump.data) {
+      mustChangePassword.value = mustChangePassword.value || !!ump.data.must_change_password
+      umpireTournamentId.value = ump.data.tournament_id
+    } else {
+      umpireTournamentId.value = null
     }
   }
 
@@ -100,6 +115,7 @@ export const useAuthStore = defineStore('auth', () => {
     user.value = null
     mustChangePassword.value = false
     teamId.value = null
+    umpireTournamentId.value = null
     isAdmin.value = false
     useTournamentStore().clear()
   }
@@ -119,9 +135,11 @@ export const useAuthStore = defineStore('auth', () => {
     error,
     mustChangePassword,
     teamId,
+    umpireTournamentId,
     isAdmin,
     isAuthenticated,
     isManager,
+    isUmpire,
     init,
     signIn,
     signOut,

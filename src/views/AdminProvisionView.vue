@@ -43,6 +43,14 @@ const email = ref('')
 const password = ref('')
 const busy = ref(false)
 
+// --- umpires (results slice R2): per-tournament accounts, provisioned like
+// managers but bound to the tournament, many per tournament ---
+const umpires = ref<{ email: string; mustChangePassword: boolean }[]>([])
+const umpireDialog = ref(false)
+const umpireEmail = ref('')
+const umpirePassword = ref('')
+const umpireBusy = ref(false)
+
 const emailError = computed(() => {
   if (!dialogTeam.value) return null
   const others = teams.value
@@ -103,12 +111,65 @@ async function load(): Promise<void> {
   errorMessage.value = null
   if (!tournaments.activeId) {
     teams.value = []
+    umpires.value = []
     return
   }
   try {
     teams.value = await fetchProvisionTeams(supabase, tournaments.activeId)
+    await loadUmpires()
   } catch (e) {
     errorMessage.value = (e as Error).message
+  }
+}
+
+async function loadUmpires(): Promise<void> {
+  if (!tournaments.activeId) {
+    umpires.value = []
+    return
+  }
+  const { data, error } = await supabase
+    .from('umpires')
+    .select('email, must_change_password')
+    .eq('tournament_id', tournaments.activeId)
+    .order('email')
+  if (error) throw error
+  umpires.value = ((data as { email: string; must_change_password: boolean }[]) ?? []).map(
+    (u) => ({ email: u.email, mustChangePassword: u.must_change_password })
+  )
+}
+
+async function onProvisionUmpire(): Promise<void> {
+  const tournamentId = tournaments.activeId
+  const corrected = umpireEmail.value.trim()
+  if (!tournamentId || !corrected || !umpirePassword.value) return
+  umpireBusy.value = true
+  try {
+    const { data, error } = await supabase.functions.invoke<{
+      ok?: boolean
+      error?: string
+    }>('provision-umpire', {
+      body: { email: corrected, password: umpirePassword.value, tournamentId }
+    })
+    if (error) {
+      result.value = { ok: false, message: error.message }
+      return
+    }
+    if (data?.error) {
+      result.value = { ok: false, message: data.error }
+      return
+    }
+    umpireDialog.value = false
+    umpireEmail.value = ''
+    umpirePassword.value = ''
+    result.value = {
+      ok: true,
+      message: `Umpire created (${corrected}) — they must change the password on first login.`
+    }
+    await loadUmpires()
+  } catch (e) {
+    result.value = { ok: false, message: (e as Error).message }
+  } finally {
+    umpireBusy.value = false
   }
 }
 
@@ -193,6 +254,71 @@ onMounted(load)
         <p v-else class="text-body-2">No teams yet.</p>
       </v-card-text>
     </v-card>
+
+    <v-card elevation="2" rounded="lg" class="mt-4">
+      <v-card-item>
+        <v-card-title>Umpires</v-card-title>
+        <v-card-subtitle>
+          Tournament-scoped accounts that enter results. Each umpire must change their password on
+          first login.
+        </v-card-subtitle>
+      </v-card-item>
+      <v-divider />
+      <v-card-text>
+        <v-table v-if="umpires.length" density="comfortable">
+          <thead>
+            <tr>
+              <th>Email</th>
+              <th>State</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="u in umpires" :key="u.email">
+              <td>{{ u.email }}</td>
+              <td>
+                <v-chip
+                  :color="u.mustChangePassword ? 'amber' : 'green'"
+                  variant="tonal"
+                  size="small"
+                >
+                  {{ u.mustChangePassword ? 'Must change password' : 'Active' }}
+                </v-chip>
+              </td>
+            </tr>
+          </tbody>
+        </v-table>
+        <p v-else class="text-body-2">No umpires provisioned yet.</p>
+        <v-btn class="mt-3" color="primary" variant="tonal" @click="umpireDialog = true">
+          Provision umpire
+        </v-btn>
+      </v-card-text>
+    </v-card>
+
+    <!-- Umpire provision dialog -->
+    <v-dialog :model-value="umpireDialog" max-width="480" @update:model-value="umpireDialog = false">
+      <v-card rounded="lg">
+        <v-card-item>
+          <v-card-title>Provision umpire</v-card-title>
+          <v-card-subtitle>The umpire must change the password on first login.</v-card-subtitle>
+        </v-card-item>
+        <v-card-text>
+          <v-text-field v-model="umpireEmail" label="Umpire email" type="email" autofocus />
+          <v-text-field v-model="umpirePassword" label="Initial password" type="password" />
+        </v-card-text>
+        <v-card-actions>
+          <v-spacer />
+          <v-btn variant="text" @click="umpireDialog = false">Cancel</v-btn>
+          <v-btn
+            color="primary"
+            :loading="umpireBusy"
+            :disabled="!umpireEmail.trim() || !umpirePassword"
+            @click="onProvisionUmpire"
+          >
+            Provision
+          </v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
 
     <!-- Provision dialog: seeded email (correctable) + initial password -->
     <v-dialog :model-value="dialogTeam != null" max-width="480" @update:model-value="dialogTeam = null">

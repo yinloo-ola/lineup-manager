@@ -1,6 +1,12 @@
 import { test, expect, type APIRequestContext, type Page } from '@playwright/test'
 import { apiToken, authHeaders, supabaseAnonKey, supabaseUrl } from './helpers'
-import { TEST_ADMIN_EMAIL, TEST_ADMIN_PASSWORD } from './global-setup'
+import {
+  DEFAULT_TOURNAMENT_ID,
+  TEST_ADMIN_EMAIL,
+  TEST_ADMIN_PASSWORD,
+  TEST_UMPIRE_EMAIL,
+  TEST_UMPIRE_NEW_PASSWORD
+} from './global-setup'
 
 // results-and-standings slice 1 (results-entry) — the feature-acceptance E2E.
 //
@@ -12,18 +18,19 @@ import { TEST_ADMIN_EMAIL, TEST_ADMIN_PASSWORD } from './global-setup'
 // Scenario 2: one side's lineup not submitted → entry refused with the reason
 // visible, and no result rows exist.
 //
-// The spec owns its fixture rows (players/category/format/ties/lineups on the
-// 'default' tournament) and converges them in beforeAll, so the suite stays
-// re-runnable without a db reset. Nothing else touches these ids.
+// The umpire account is provisioned by global-setup (once per run — the specs
+// run in parallel workers, which would race a per-spec provisioning). The spec
+// owns its fixture rows (players/category/format/ties/lineups on the 'default'
+// tournament) and converges them in beforeAll, so the suite stays re-runnable
+// without a db reset. Nothing else touches these ids.
 
-const UMPIRE_EMAIL = 'umpire@lineup.local'
-const UMPIRE_PASSWORD = 'umpire-password-123'
-const UMPIRE_NEW_PASSWORD = 'umpire-new-pw-123'
+const UMPIRE_EMAIL = TEST_UMPIRE_EMAIL
+const UMPIRE_NEW_PASSWORD = TEST_UMPIRE_NEW_PASSWORD
 
 const RES_CAT = 'e2e-cat-res'
 const RES_TIE = 'e2e-tie-res'
 const GATE_TIE = 'e2e-tie-res-gate'
-const TOURNAMENT = 'default'
+const TOURNAMENT = DEFAULT_TOURNAMENT_ID
 
 // Three-rubber singles format (best-of-5 games per rubber by the tie default):
 // r1/r2 won by Alpha, r3 by Charlie → Alpha 2–1 decided; the admin override
@@ -55,35 +62,38 @@ function jsonHeaders(token?: string): Record<string, string> {
 
 test.beforeAll(async ({ request }) => {
   const admin = await apiToken(request, TEST_ADMIN_EMAIL, TEST_ADMIN_PASSWORD)
+  const upsertHeaders = { ...authHeaders(admin), Prefer: 'resolution=merge-duplicates' }
 
-  // Re-runnability: drop any result rows and lineups from a prior run first.
+  // Re-runnability: drop any result rows from a prior run first. (Lineups are
+  // converged by upsert below — never deleted here, so a parallel worker's
+  // page load can never observe a delete window.)
   for (const tie of [RES_TIE, GATE_TIE]) {
     const del = await request.delete(
       `${supabaseUrl}/rest/v1/rubber_results?tie_id=eq.${tie}`,
       { headers: authHeaders(admin) }
     )
-    if (!del.ok && del.status() !== 404) {
+    if (!del.ok() && del.status() !== 404) {
       throw new Error(`delete rubber_results (${tie}) failed: ${await del.text()}`)
     }
-  }
-  const delLineups = await request.delete(
-    `${supabaseUrl}/rest/v1/lineups?tie_id=in.(${RES_TIE},${GATE_TIE})`,
-    { headers: authHeaders(admin) }
-  )
-  if (!delLineups.ok) {
-    throw new Error(`delete fixture lineups failed: ${await delLineups.text()}`)
   }
 
   // Fixture: category + 3-rubber singles format, rosters (Alpha's Alan/Adam/
   // Arnie, Charlie's Chas/Chet/Chad), the two ties, and submitted lineups for
   // the entry tie (both sides) and only Alpha's lineup for the gate tie.
-  await request.patch(`${supabaseUrl}/rest/v1/categories?id=eq.${RES_CAT}`, {
-    headers: authHeaders(admin),
-    data: { id: RES_CAT, tournament_id: TOURNAMENT, name: 'E2E Results', short_name: 'ER' }
-  })
-  await request.patch(`${supabaseUrl}/rest/v1/tie_formats?category_id=eq.${RES_CAT}`, {
-    headers: authHeaders(admin),
-    data: {
+  const post = async (table: string, data: unknown): Promise<void> => {
+    const res = await request.post(`${supabaseUrl}/rest/v1/${table}`, {
+      headers: upsertHeaders,
+      data
+    })
+    if (!res.ok()) {
+      throw new Error(`upsert ${table} failed (${res.status()}): ${await res.text()}`)
+    }
+  }
+  await post('categories', [
+    { id: RES_CAT, tournament_id: TOURNAMENT, name: 'E2E Results', short_name: 'ER' }
+  ])
+  await post('tie_formats', [
+    {
       category_id: RES_CAT,
       tournament_id: TOURNAMENT,
       rubbers: [
@@ -94,113 +104,66 @@ test.beforeAll(async ({ request }) => {
       usage_policy: null,
       lead_time_minutes: 30
     }
-  })
-  await request.patch(`${supabaseUrl}/rest/v1/players?id=in.(e2e-p5,e2e-p6,e2e-p7,e2e-p8,e2e-p9)`, {
-    headers: authHeaders(admin),
-    data: [
-      { id: 'e2e-p5', tournament_id: TOURNAMENT, team_id: 'e2e-c', name: 'Chas', gender: 'M', date_of_birth: '1991-01-01' },
-      { id: 'e2e-p6', tournament_id: TOURNAMENT, team_id: 'e2e-c', name: 'Chet', gender: 'M', date_of_birth: '1993-01-01' },
-      { id: 'e2e-p7', tournament_id: TOURNAMENT, team_id: 'e2e-a', name: 'Adam', gender: 'M', date_of_birth: '1987-01-01' },
-      { id: 'e2e-p8', tournament_id: TOURNAMENT, team_id: 'e2e-a', name: 'Arnie', gender: 'M', date_of_birth: '1986-01-01' },
-      { id: 'e2e-p9', tournament_id: TOURNAMENT, team_id: 'e2e-c', name: 'Chad', gender: 'M', date_of_birth: '1995-01-01' }
-    ]
-  })
-  await request.patch(`${supabaseUrl}/rest/v1/ties?id=in.(${RES_TIE},${GATE_TIE})`, {
-    headers: authHeaders(admin),
-    data: [
-      {
-        id: RES_TIE,
-        tournament_id: TOURNAMENT,
-        category_id: RES_CAT,
-        scheduled_start: '2099-03-01T10:00:00+00:00',
-        table_label: '6',
-        team_a: 'e2e-a',
-        team_b: 'e2e-c',
-        is_knockout: false
-      },
-      {
-        id: GATE_TIE,
-        tournament_id: TOURNAMENT,
-        category_id: RES_CAT,
-        scheduled_start: '2099-03-01T12:00:00+00:00',
-        table_label: '7',
-        team_a: 'e2e-a',
-        team_b: 'e2e-c',
-        is_knockout: false
-      }
-    ]
-  })
-  const lineups = await request.post(`${supabaseUrl}/rest/v1/lineups`, {
-    headers: { ...authHeaders(admin), Prefer: 'resolution=merge-duplicates' },
-    data: [
-      {
-        tie_id: RES_TIE,
-        tournament_id: TOURNAMENT,
-        team_id: 'e2e-a',
-        player_ids: [['e2e-p2'], ['e2e-p7'], ['e2e-p8']],
-        status: 'submitted',
-        submitted_at: '2026-02-01T00:00:00Z',
-        updated_at: '2026-02-01T00:00:00Z'
-      },
-      {
-        tie_id: RES_TIE,
-        tournament_id: TOURNAMENT,
-        team_id: 'e2e-c',
-        player_ids: [['e2e-p5'], ['e2e-p6'], ['e2e-p9']],
-        status: 'submitted',
-        submitted_at: '2026-02-01T00:00:00Z',
-        updated_at: '2026-02-01T00:00:00Z'
-      },
-      {
-        // Gate tie: only Alpha submitted — Charlie's side stays unsubmitted.
-        tie_id: GATE_TIE,
-        tournament_id: TOURNAMENT,
-        team_id: 'e2e-a',
-        player_ids: [['e2e-p2'], ['e2e-p7'], ['e2e-p8']],
-        status: 'submitted',
-        submitted_at: '2026-02-01T00:00:00Z',
-        updated_at: '2026-02-01T00:00:00Z'
-      }
-    ]
-  })
-  if (!lineups.ok) {
-    throw new Error(`insert fixture lineups failed: ${await lineups.text()}`)
-  }
-
-  // Provision the umpire via the REAL edge function (the actual provisioning
-  // path — service_role lives inside the function, never in test code).
-  const provision = await request.post(`${supabaseUrl}/functions/v1/provision-umpire`, {
-    headers: jsonHeaders(admin),
-    data: { email: UMPIRE_EMAIL, password: UMPIRE_PASSWORD, tournamentId: TOURNAMENT }
-  })
-  if (!provision.ok() && provision.status() !== 409) {
-    throw new Error(`provision umpire failed (${provision.status()}): ${await provision.text()}`)
-  }
-
-  // Converge the umpire's first-login state (temp password + cleared flag) so
-  // the UI sign-in below is stable across re-runs — mirroring global-setup's
-  // manager convergence.
-  const existing = await signInOrNull(request, UMPIRE_EMAIL, UMPIRE_NEW_PASSWORD)
-  if (existing) {
-    await request.post(`${supabaseUrl}/rest/v1/rpc/clear_must_change_password`, {
-      headers: jsonHeaders(existing)
-    })
-  } else {
-    const token = await signIn(request, UMPIRE_EMAIL, UMPIRE_PASSWORD)
-    const upd = await request.put(`${supabaseUrl}/auth/v1/user`, {
-      headers: jsonHeaders(token),
-      data: { password: UMPIRE_NEW_PASSWORD }
-    })
-    if (!upd.ok()) {
-      throw new Error(`umpire password change failed (${upd.status()}): ${await upd.text()}`)
+  ])
+  await post('players', [
+    { id: 'e2e-p5', tournament_id: TOURNAMENT, team_id: 'e2e-c', name: 'Chas', gender: 'M', date_of_birth: '1991-01-01' },
+    { id: 'e2e-p6', tournament_id: TOURNAMENT, team_id: 'e2e-c', name: 'Chet', gender: 'M', date_of_birth: '1993-01-01' },
+    { id: 'e2e-p7', tournament_id: TOURNAMENT, team_id: 'e2e-a', name: 'Adam', gender: 'M', date_of_birth: '1987-01-01' },
+    { id: 'e2e-p8', tournament_id: TOURNAMENT, team_id: 'e2e-a', name: 'Arnie', gender: 'M', date_of_birth: '1986-01-01' },
+    { id: 'e2e-p9', tournament_id: TOURNAMENT, team_id: 'e2e-c', name: 'Chad', gender: 'M', date_of_birth: '1995-01-01' }
+  ])
+  await post('ties', [
+    {
+      id: RES_TIE,
+      tournament_id: TOURNAMENT,
+      category_id: RES_CAT,
+      scheduled_start: '2099-03-01T10:00:00+00:00',
+      table_label: '6',
+      team_a: 'e2e-a',
+      team_b: 'e2e-c',
+      is_knockout: false
+    },
+    {
+      id: GATE_TIE,
+      tournament_id: TOURNAMENT,
+      category_id: RES_CAT,
+      scheduled_start: '2099-03-01T12:00:00+00:00',
+      table_label: '7',
+      team_a: 'e2e-a',
+      team_b: 'e2e-c',
+      is_knockout: false
     }
-    const clr = await request.post(`${supabaseUrl}/rest/v1/rpc/clear_must_change_password`, {
-      headers: jsonHeaders(await signIn(request, UMPIRE_EMAIL, UMPIRE_NEW_PASSWORD))
-    })
-    if (!clr.ok()) {
-      throw new Error(`clear umpire must-change failed (${clr.status()}): ${await clr.text()}`)
+  ])
+  await post('lineups', [
+    {
+      tie_id: RES_TIE,
+      tournament_id: TOURNAMENT,
+      team_id: 'e2e-a',
+      player_ids: [['e2e-p2'], ['e2e-p7'], ['e2e-p8']],
+      status: 'submitted',
+      submitted_at: '2026-02-01T00:00:00Z',
+      updated_at: '2026-02-01T00:00:00Z'
+    },
+    {
+      tie_id: RES_TIE,
+      tournament_id: TOURNAMENT,
+      team_id: 'e2e-c',
+      player_ids: [['e2e-p5'], ['e2e-p6'], ['e2e-p9']],
+      status: 'submitted',
+      submitted_at: '2026-02-01T00:00:00Z',
+      updated_at: '2026-02-01T00:00:00Z'
+    },
+    {
+      // Gate tie: only Alpha submitted — Charlie's side stays unsubmitted.
+      tie_id: GATE_TIE,
+      tournament_id: TOURNAMENT,
+      team_id: 'e2e-a',
+      player_ids: [['e2e-p2'], ['e2e-p7'], ['e2e-p8']],
+      status: 'submitted',
+      submitted_at: '2026-02-01T00:00:00Z',
+      updated_at: '2026-02-01T00:00:00Z'
     }
-  }
+  ])
 })
 
 async function signIn(request: APIRequestContext, email: string, password: string): Promise<string> {
@@ -278,17 +241,8 @@ test.describe('results entry (feature acceptance)', () => {
     await page.getByRole('button', { name: /sign in/i }).click()
     await expect(page).toHaveURL(/\/matches$/)
 
-    await page.getByRole('button', { name: /results/i }).first().click()
-    const dialog = page.getByRole('dialog')
-    await expect(dialog).toBeVisible()
-    await dialog
-      .getByLabel('Tournament')
-      .selectOption({ label: 'E2E Results' })
-      .catch(() => {
-        // The dashboard scopes rows per category via the tournament selector;
-        // when the fixture category needs selecting first, its option is named
-        // 'E2E Results'. If no selector exists the rows are already filtered.
-      })
+    // The dashboard sorts by scheduled time, so the 10:00 entry tie (RES_TIE)
+    // is the first Alpha-vs-Charlie row.
     const resRow = page
       .locator('tr')
       .filter({ hasText: 'Alpha' })

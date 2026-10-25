@@ -30,6 +30,14 @@ export const TEST_MANAGER3_EMAIL = 'manager3@lineup.local'
 export const TEST_MANAGER3_PASSWORD = 'manager3-password-123'
 export const TEST_MANAGER3_NEW_PASSWORD = 'manager3-new-pw-123'
 
+// The results-entry umpire (results-and-standings slice 1), bound to the
+// 'default' tournament. Provisioned via the REAL provision-umpire edge
+// function and converged to the ready (password-changed) state, like manager2.
+export const TEST_UMPIRE_EMAIL = 'umpire@lineup.local'
+export const TEST_UMPIRE_PASSWORD = 'umpire-password-123'
+export const TEST_UMPIRE_NEW_PASSWORD = 'umpire-new-pw-123'
+export const DEFAULT_TOURNAMENT_ID = 'default'
+
 function jsonHeaders(token?: string): Record<string, string> {
   const h: Record<string, string> = {
     'Content-Type': 'application/json',
@@ -268,6 +276,26 @@ export default async function globalSetup(): Promise<void> {
   await provisionManager(adminToken, TEST_MANAGER_EMAIL, TEST_MANAGER_PASSWORD, 'e2e-a')
   await provisionManager(adminToken, TEST_MANAGER2_EMAIL, TEST_MANAGER2_PASSWORD, 'e2e-b')
   await provisionManager(adminToken, TEST_MANAGER3_EMAIL, TEST_MANAGER3_PASSWORD, 'e2e-ka')
+
+  // 3a. Provision the results umpire via the real provision-umpire edge
+  // function, then complete its first-login change so the results specs can
+  // sign straight in. (409 = already an umpire for this tournament — the
+  // re-used-stack case; completeFirstLogin converges the state regardless.)
+  const provisioned = await fetch(`${url}/functions/v1/provision-umpire`, {
+    method: 'POST',
+    headers: jsonHeaders(adminToken),
+    body: JSON.stringify({
+      email: TEST_UMPIRE_EMAIL,
+      password: TEST_UMPIRE_PASSWORD,
+      tournamentId: DEFAULT_TOURNAMENT_ID
+    })
+  })
+  if (!provisioned.ok && provisioned.status !== 409) {
+    throw new Error(
+      `provision umpire failed (${provisioned.status}): ${await provisioned.text()}`
+    )
+  }
+  await completeFirstLogin(TEST_UMPIRE_EMAIL, TEST_UMPIRE_PASSWORD, TEST_UMPIRE_NEW_PASSWORD)
 
   // 3b. Converge manager1 back to the forced-first-login state. manager.spec is
   // destructive — it COMPLETES the password change — so a re-run without a db
