@@ -2,6 +2,7 @@
 // rubber results. Nothing here touches Supabase; services map rows in/out.
 
 import { ParseError } from './parse-helpers'
+import type { LineupStatus } from './types'
 
 /**
  * Validate a tie's best-of-games setting: a positive odd integer (5 is the
@@ -21,4 +22,20 @@ export function parseBestOf(input: unknown): number {
     throw new ParseError('Best of must be a positive odd number of games (1, 3, 5, …).')
   }
   return n
+}
+
+/**
+ * The entry gate: results can be entered for a tie only once BOTH of its sides
+ * have a submitted lineup (a TBD side can never satisfy the gate). Pure.
+ */
+export function bothLineupsSubmitted(
+  lineups: { teamId: string; status: LineupStatus }[],
+  teamIds: [string | null, string | null]
+): boolean {
+  const [a, b] = teamIds
+  if (a === null || b === null) return false
+  const submitted = new Set(
+    lineups.filter((l) => l.status === 'submitted').map((l) => l.teamId)
+  )
+  return submitted.has(a) && submitted.has(b)
 }

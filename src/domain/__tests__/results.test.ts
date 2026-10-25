@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { parseBestOf } from '../results'
+import { bothLineupsSubmitted, parseBestOf } from '../results'
 
 describe('parseBestOf', () => {
   it('accepts odd positive numbers', () => {
@@ -27,5 +27,24 @@ describe('parseBestOf', () => {
     expect(() => parseBestOf(3.5)).toThrow(/odd/i)
     expect(() => parseBestOf('')).toThrow(/odd/i)
     expect(() => parseBestOf('five')).toThrow(/odd/i)
+  })
+})
+
+describe('bothLineupsSubmitted', () => {
+  const lineups = (statuses: ('submitted' | 'draft' | 'not-started' | 'invalidated')[]) =>
+    statuses.map((status, i) => ({ teamId: `t${i}`, status }))
+
+  it('is satisfied when both tie sides submitted', () => {
+    expect(bothLineupsSubmitted(lineups(['submitted', 'submitted']), ['t0', 't1'])).toBe(true)
+  })
+
+  it('is unsatisfied when either side is missing or unsubmitted', () => {
+    expect(bothLineupsSubmitted(lineups(['submitted', 'draft']), ['t0', 't1'])).toBe(false)
+    expect(bothLineupsSubmitted(lineups(['submitted']), ['t0', 't1'])).toBe(false)
+    expect(bothLineupsSubmitted([], ['t0', 't1'])).toBe(false)
+  })
+
+  it('is unsatisfied for a TBD side', () => {
+    expect(bothLineupsSubmitted(lineups(['submitted', 'submitted']), ['t0', null])).toBe(false)
   })
 })
