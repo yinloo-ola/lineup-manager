@@ -17,6 +17,11 @@ const TEAM_B = 'e2e-fg-b'
 const TIE_ID = 'e2e-fg-tie'
 const PLAYER_ID = 'e2e-fg-p1'
 
+// A start date ~30 days out, computed at run time: the freeze anchors on the
+// start date, so a hard-coded "future" date time-bombs into a frozen page once
+// the calendar passes it (seen 2026-10-25 with the original 2026-09-01).
+const FUTURE_START = new Date(Date.now() + 30 * 24 * 3600 * 1000).toISOString().slice(0, 10)
+
 /** Make the throwaway tournament the active one and land on its Matches page. */
 async function activate(page: Page): Promise<void> {
   await page.getByRole('combobox', { name: 'Tournament' }).click({ force: true })
@@ -36,7 +41,7 @@ test.describe.serial('format guard + freeze (#16)', () => {
     // start date anchors age evaluation near today WITHOUT starting the
     // tournament (that would freeze the format — the freeze test does that
     // later; afterAll converges the value back).
-    await upsert('tournaments', [{ id: TOUR_ID, name: TOUR_NAME, start_date: '2026-09-01' }])
+    await upsert('tournaments', [{ id: TOUR_ID, name: TOUR_NAME, start_date: FUTURE_START }])
     await upsert('categories', [{ id: CAT_ID, tournament_id: TOUR_ID, name: CAT_NAME, short_name: 'FG' }])
     await upsert('teams', [
       { id: TEAM_A, tournament_id: TOUR_ID, name: 'Guardians' },
@@ -84,7 +89,7 @@ test.describe.serial('format guard + freeze (#16)', () => {
     const admin = await apiToken(request, TEST_ADMIN_EMAIL, TEST_ADMIN_PASSWORD)
     await request.patch(`${supabaseUrl}/rest/v1/tournaments?id=eq.${TOUR_ID}`, {
       headers: { ...authHeaders(admin), Prefer: 'return=minimal' },
-      data: { start_date: '2026-09-01' }
+      data: { start_date: FUTURE_START }
     })
   })
 
