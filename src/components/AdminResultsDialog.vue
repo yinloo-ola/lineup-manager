@@ -2,7 +2,8 @@
 // The administrator's results dialog (results slice R6): everything editable —
 // players per rubber per side, game scores, walkovers (with side) and the
 // tie's best-of — regardless of who entered the data and at any time. Saves go
-// through saveRubberResult, which re-checks the entry gate server-side.
+// through saveRubberResult, which enforces the entry gate and the game rules
+// for this client path; admin writes stay admin-scoped by RLS.
 import { reactive, ref, watch } from 'vue'
 import { supabase } from '@/lib/supabase'
 import { setTieBestOf, saveRubberResult, type TieResultContext } from '@/services/resultsService'
@@ -104,9 +105,7 @@ async function onSave(): Promise<void> {
 
   // Best-of first: a change saves through the same odd-only path as R1.
   const bestOf = Number(bestOfDraft.value)
-  let bestOfChanged = bestOf !== ctx.bestOf
 
-  let touched = 0
   for (let i = 0; i < rubbers.length; i += 1) {
     const r = rubbers[i]
     const games: GameScore[] = r.games
@@ -121,20 +120,18 @@ async function onSave(): Promise<void> {
       violations.push({ kind: 'bad-score', message: 'Both sides of a game need scores.' })
     }
     if (violations.length > 0) violationsByRubber[i] = violations.map((v) => v.message)
-    if (r.walkover || games.length > 0) touched += 1
   }
   if (Object.keys(violationsByRubber).length > 0) return
 
   saving.value = true
   try {
-    if (bestOfChanged) {
+    if (bestOf !== ctx.bestOf) {
       try {
         await setTieBestOf(supabase, props.tieId, bestOfDraft.value)
       } catch (e) {
         bestOfError.value = (e as Error).message
         return
       }
-      bestOfChanged = false
     }
     for (let i = 0; i < rubbers.length; i += 1) {
       const r = rubbers[i]

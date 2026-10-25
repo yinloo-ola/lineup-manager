@@ -108,7 +108,7 @@ describe('buildUmpireTieRows', () => {
           ],
           walkover: false
         },
-        { tieId: 't2', rubberIndex: 2, games: [], walkover: true }
+        { tieId: 't2', rubberIndex: 2, games: [], walkover: true, walkoverSide: 'a' }
       ],
       bestOfByTie: new Map([
         ['t1', 5],
@@ -121,20 +121,36 @@ describe('buildUmpireTieRows', () => {
     expect(rows[1].winnerName).toBe('Alpha')
   })
 
-  it('a walkover for side b decides in b\'s favour', () => {
-    const rows = buildUmpireTieRows({
-      ties: [baseTie],
-      lineups: [
-        { tieId: 't1', teamId: 'a', status: 'submitted' },
-        { tieId: 't1', teamId: 'b', status: 'submitted' }
-      ],
-      teamNameById: names,
-      rubberCountByTie: new Map([['t1', 1]]),
-      bestOfByTie: new Map([['t1', 5]]),
-      results: [{ tieId: 't1', rubberIndex: 1, games: [], walkover: true }]
-    })
-    expect(rows[0].state).toBe('decided')
-    expect(rows[0].winnerSide).toBe('a') // walkover side defaults to a
+  it('a walkover decides only with its recorded side', () => {
+    const withSide = () =>
+      buildUmpireTieRows({
+        ties: [baseTie],
+        lineups: [
+          { tieId: 't1', teamId: 'a', status: 'submitted' },
+          { tieId: 't1', teamId: 'b', status: 'submitted' }
+        ],
+        teamNameById: names,
+        rubberCountByTie: new Map([['t1', 1]]),
+        bestOfByTie: new Map([['t1', 5]]),
+        results: [{ tieId: 't1', rubberIndex: 1, games: [], walkover: true, walkoverSide: 'a' }]
+      })
+    const sideless = () =>
+      buildUmpireTieRows({
+        ties: [baseTie],
+        lineups: [
+          { tieId: 't1', teamId: 'a', status: 'submitted' },
+          { tieId: 't1', teamId: 'b', status: 'submitted' }
+        ],
+        teamNameById: names,
+        rubberCountByTie: new Map([['t1', 1]]),
+        bestOfByTie: new Map([['t1', 5]]),
+        results: [{ tieId: 't1', rubberIndex: 1, games: [], walkover: true }]
+      })
+    expect(withSide()[0].state).toBe('decided')
+    expect(withSide()[0].winnerSide).toBe('a')
+    // A side-less walkover is undecided — never a silent default win.
+    expect(sideless()[0].state).toBe('partial')
+    expect(sideless()[0].winnerSide).toBeUndefined()
   })
 
   it('stays not-entered when no results are passed', () => {

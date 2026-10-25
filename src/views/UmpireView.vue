@@ -239,13 +239,12 @@ onMounted(load)
                 <td>{{ stateLabel(r) }}</td>
                 <td class="text-right">
                   <v-btn
-                    v-if="r.state !== 'decided'"
                     size="small"
                     color="primary"
                     variant="tonal"
                     @click="openEntry(r)"
                   >
-                    Enter results
+                    {{ r.state === 'decided' ? 'Edit results' : 'Enter results' }}
                   </v-btn>
                 </td>
               </tr>

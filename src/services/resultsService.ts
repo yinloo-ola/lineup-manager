@@ -1,5 +1,14 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
-import { bothLineupsSubmitted, parseBestOf, type GameScore, type Side } from '@/domain/results'
+import {
+  DEFAULT_BEST_OF,
+  bothLineupsSubmitted,
+  parseBestOf,
+  validateGames,
+  type GameScore,
+  type Side
+} from '@/domain/results'
+import { parseStatus } from '@/services/adminScope'
+import type { LineupStatus } from '@/domain/types'
 
 /** A typed guard rejection from the results entry path (mapped to UI toasts). */
 export class ResultEntryError extends Error {}
@@ -41,11 +50,25 @@ export async function saveRubberResult(
     rubberIndex: number
     /** Per-side player id arrays (admin override — umpires ride the RPC). */
     playerIds: [unknown, unknown]
-    games: unknown
+    games: GameScore[]
     walkover: boolean
     walkoverSide?: Side | null
+    /** The tie's best-of, for entry-time decidedness validation. */
+    bestOf?: number
   }
 ): Promise<void> {
+  // Entry-time validation runs here too — the dialogs validate for UX, but the
+  // service is the seam every admin save crosses, so the rules live here.
+  if (input.walkover && input.walkoverSide !== 'a' && input.walkoverSide !== 'b') {
+    throw new ResultEntryError('A walkover needs its winning side.')
+  }
+  const violations = input.walkover
+    ? validateGames([], input.bestOf ?? DEFAULT_BEST_OF, true, input.walkoverSide ?? undefined)
+    : validateGames(input.games, input.bestOf ?? DEFAULT_BEST_OF)
+  if (violations.length > 0) {
+    throw new ResultEntryError(violations[0].message)
+  }
+
   const tieRes = await client
     .from('ties')
     .select('tournament_id, team_a, team_b, is_knockout')
@@ -70,7 +93,7 @@ export async function saveRubberResult(
   if (lineupsRes.error) throw lineupsRes.error
   const lineups = ((lineupsRes.data as { team_id: string; status: string }[]) ?? []).map((l) => ({
     teamId: l.team_id,
-    status: l.status as 'submitted'
+    status: parseStatus(l.status) as LineupStatus
   }))
   if (!bothLineupsSubmitted(lineups, [tie.team_a, tie.team_b])) {
     throw new ResultEntryError('Both lineups must be submitted before results can be entered.')
@@ -88,6 +111,33 @@ export async function saveRubberResult(
     },
     { onConflict: 'tie_id,rubber_index' }
   )
+  if (error) throw error
+}
+
+/**
+ * The umpire's save of one rubber's result, through the upsert_umpire_result
+ * security-definer RPC (migration 0018–0020): the server re-checks the
+ * tournament scope, the entry gate, the rubber bounds and the games shape, and
+ * derives the stored player identity from the submitted lineups — the client
+ * cannot write player_ids. Wrapped here so the RPC seam has one error path.
+ */
+export async function upsertUmpireResult(
+  client: SupabaseClient,
+  input: {
+    tieId: string
+    rubberIndex: number
+    games: GameScore[]
+    walkover: boolean
+    walkoverSide?: Side | null
+  }
+): Promise<void> {
+  const { error } = await client.rpc('upsert_umpire_result', {
+    p_tie_id: input.tieId,
+    p_rubber_index: input.rubberIndex,
+    p_games: input.games,
+    p_walkover: input.walkover,
+    p_walkover_side: input.walkover ? (input.walkoverSide ?? null) : null
+  })
   if (error) throw error
 }
 

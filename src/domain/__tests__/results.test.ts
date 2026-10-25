@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import {
   bothLineupsSubmitted,
+  deriveTieResult,
   parseBestOf,
   rubberWinner,
   tieWinner,
@@ -64,10 +65,51 @@ describe('rubberWinner', () => {
     expect(rubberWinner([{ a: 5, b: 11 }, { a: 7, b: 11 }], 3)).toBe('b')
   })
 
-  it('walkover is decided without games', () => {
-    expect(rubberWinner([], 5, true)).toBe('a')
+  it('walkover is decided without games — only with an explicit side', () => {
+    // A walkover without a recorded side is UNDECIDED, never a silent A-win.
+    expect(rubberWinner([], 5, true)).toBeNull()
+    expect(rubberWinner([], 5, true, 'a')).toBe('a')
     expect(rubberWinner([], 5, true, 'b')).toBe('b')
-    expect(rubberWinner([], 5, true, 'b')).not.toBe('a')
+  })
+})
+
+describe('deriveTieResult', () => {
+  const decided = (side: 'a' | 'b') => ({
+    tieId: 't1',
+    rubberIndex: 1,
+    games: [
+      side === 'a' ? { a: 11, b: 5 } : { a: 5, b: 11 },
+      side === 'a' ? { a: 11, b: 7 } : { a: 7, b: 11 },
+      side === 'a' ? { a: 11, b: 9 } : { a: 9, b: 11 }
+    ],
+    walkover: false,
+    walkoverSide: null
+  })
+
+  it('derives decided with the winner side', () => {
+    expect(deriveTieResult([decided('a'), { ...decided('a'), rubberIndex: 2 }], 5, 3)).toEqual({
+      state: 'decided',
+      winnerSide: 'a'
+    })
+  })
+
+  it('derives partial when entered rubbers do not reach the majority', () => {
+    expect(deriveTieResult([decided('a')], 5, 3)).toEqual({ state: 'partial' })
+  })
+
+  it('counts a walkover for its recorded side only', () => {
+    const walkoverA = { tieId: 't1', rubberIndex: 2, games: [], walkover: true, walkoverSide: 'a' as const }
+    const sideless = { tieId: 't1', rubberIndex: 2, games: [], walkover: true, walkoverSide: null }
+    expect(deriveTieResult([decided('b'), walkoverA], 5, 3)).toEqual({ state: 'partial' })
+    expect(
+      deriveTieResult(
+        [decided('b'), walkoverA, { ...decided('b'), rubberIndex: 3 }],
+        5,
+        3
+      )
+    ).toEqual({ state: 'decided', winnerSide: 'b' })
+    // A side-less walkover counts for neither side.
+    expect(deriveTieResult([decided('a'), sideless], 5, 3)).toEqual({ state: 'partial' })
   })
 })
 

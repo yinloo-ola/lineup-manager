@@ -12,7 +12,7 @@ import {
   type BuildAdminLineupRowsArgs
 } from './adminView'
 import { computeCutoff, isLocked } from './cutoff'
-import { rubberWinner, tieWinner, type GameScore, type Side } from './results'
+import { DEFAULT_BEST_OF, deriveTieResult, type GameScore, type Side } from './results'
 import type { LineupStatus } from './types'
 import { sideDisplayName } from './teamNames'
 
@@ -235,16 +235,14 @@ function deriveResultState(
 ): Pick<MatchRow, 'resultState' | 'winnerName'> {
   if (results.length === 0 || (tie.isKnockout ?? false)) return {}
   if (tie.teamIds[0] === null || tie.teamIds[1] === null) return {}
-  const bestOf = tie.bestOf ?? 5
   if (rubberCount === 0) return {}
-  const entered = [...results].sort((a, b) => a.rubberIndex - b.rubberIndex)
-  const winners = entered.map((r) =>
-    rubberWinner(r.games, bestOf, r.walkover, r.walkoverSide ?? 'a')
-  )
-  const winner = tieWinner(winners, rubberCount)
-  if (winner === null) return { resultState: 'partial' }
+  const derived = deriveTieResult(results, tie.bestOf ?? DEFAULT_BEST_OF, rubberCount)
+  if (derived.state === 'partial' || !derived.winnerSide) return { resultState: 'partial' }
   return {
     resultState: 'decided',
-    winnerName: sideDisplayName(winner === 'a' ? tie.teamIds[0] : tie.teamIds[1], teamNameById)
+    winnerName: sideDisplayName(
+      derived.winnerSide === 'a' ? tie.teamIds[0] : tie.teamIds[1],
+      teamNameById
+    )
   }
 }

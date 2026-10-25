@@ -3,7 +3,7 @@
 // entry state derived from the entered rubber results (not-entered / partial /
 // decided, with the derived winner). Pure: no UI, no network.
 
-import { rubberWinner, tieWinner, type GameScore, type Side } from './results'
+import { DEFAULT_BEST_OF, deriveTieResult, type GameScore, type Side } from './results'
 import { sideDisplayName } from './teamNames'
 import type { Lineup } from './types'
 
@@ -82,19 +82,16 @@ export function buildUmpireTieRows(args: {
       let winnerName: string | undefined
       if (entryOpen) {
         const rubberCount = args.rubberCountByTie?.get(t.tieId)
-        const bestOf = args.bestOfByTie?.get(t.tieId) ?? 5
+        const bestOf = args.bestOfByTie?.get(t.tieId) ?? DEFAULT_BEST_OF
         const entered = (resultsByTie.get(t.tieId) ?? []).sort(
           (x, y) => x.rubberIndex - y.rubberIndex
         )
         if (rubberCount !== undefined && entered.length > 0) {
-          const winners = entered.map((r) =>
-            rubberWinner(r.games, bestOf, r.walkover, r.walkoverSide ?? 'a')
-          )
-          const winner = tieWinner(winners, rubberCount)
-          if (winner !== null) {
+          const derived = deriveTieResult(entered, bestOf, rubberCount)
+          if (derived.state === 'decided' && derived.winnerSide) {
             state = 'decided'
-            winnerSide = winner
-            winnerName = winner === 'a' ? teamAName : teamBName
+            winnerSide = derived.winnerSide
+            winnerName = derived.winnerSide === 'a' ? teamAName : teamBName
           } else {
             state = 'partial'
           }

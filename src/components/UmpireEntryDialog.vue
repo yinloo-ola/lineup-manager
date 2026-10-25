@@ -8,6 +8,7 @@
 // upsert_umpire_result RPC — the gate is enforced server-side.
 import { computed, reactive, ref, watch } from 'vue'
 import { supabase } from '@/lib/supabase'
+import { upsertUmpireResult } from '@/services/resultsService'
 import {
   validateGames,
   type GameScore,
@@ -131,15 +132,16 @@ async function onSave(): Promise<void> {
         .filter((g) => g.a !== '' && g.b !== '')
         .map((g) => ({ a: Number(g.a), b: Number(g.b) }))
       if (!r.walkover && games.length === 0) continue
-      const { error } = await supabase.rpc('upsert_umpire_result', {
-        p_tie_id: props.tieId,
-        p_rubber_index: i + 1,
-        p_games: games,
-        p_walkover: r.walkover,
-        p_walkover_side: r.walkover ? r.walkoverSide : null
-      })
-      if (error) {
-        serverError.value = error.message
+      try {
+        await upsertUmpireResult(supabase, {
+          tieId: props.tieId,
+          rubberIndex: i + 1,
+          games,
+          walkover: r.walkover,
+          walkoverSide: r.walkover ? r.walkoverSide : null
+        })
+      } catch (e) {
+        serverError.value = (e as Error).message
         return
       }
     }

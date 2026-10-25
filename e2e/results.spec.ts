@@ -305,4 +305,144 @@ test.describe('results entry (feature acceptance)', () => {
     expect(read.ok()).toBeTruthy()
     expect(await read.json()).toEqual([])
   })
+
+  test('RLS boundaries: RPC is umpire-only, manager read/write split, cross-tournament denial, player immutability', async ({
+    request
+  }) => {
+    const umpire = await signIn(request, UMPIRE_EMAIL, UMPIRE_NEW_PASSWORD)
+    const manager = await signIn(request, 'manager2@lineup.local', 'manager2-new-pw-123')
+    const admin = await apiToken(request, TEST_ADMIN_EMAIL, TEST_ADMIN_PASSWORD)
+
+    // Own fixture tie — never shared with the other scenarios, so these
+    // assertions are race-free. Same category/format as the entry fixtures.
+    const RLS_TIE = 'e2e-tie-res-rls'
+    const upsertHeaders = { ...authHeaders(admin), Prefer: 'resolution=merge-duplicates' }
+    await request.post(`${supabaseUrl}/rest/v1/ties`, {
+      headers: upsertHeaders,
+      data: [
+        {
+          id: RLS_TIE,
+          tournament_id: TOURNAMENT,
+          category_id: RES_CAT,
+          scheduled_start: '2099-03-01T14:00:00+00:00',
+          table_label: '8',
+          team_a: 'e2e-a',
+          team_b: 'e2e-c',
+          is_knockout: false
+        }
+      ]
+    })
+    await request.post(`${supabaseUrl}/rest/v1/lineups`, {
+      headers: upsertHeaders,
+      data: [
+        {
+          tie_id: RLS_TIE,
+          tournament_id: TOURNAMENT,
+          team_id: 'e2e-a',
+          player_ids: [['e2e-p2'], ['e2e-p7'], ['e2e-p8']],
+          status: 'submitted',
+          submitted_at: '2026-02-01T00:00:00Z',
+          updated_at: '2026-02-01T00:00:00Z'
+        },
+        {
+          tie_id: RLS_TIE,
+          tournament_id: TOURNAMENT,
+          team_id: 'e2e-c',
+          player_ids: [['e2e-p5'], ['e2e-p6'], ['e2e-p9']],
+          status: 'submitted',
+          submitted_at: '2026-02-01T00:00:00Z',
+          updated_at: '2026-02-01T00:00:00Z'
+        }
+      ]
+    })
+
+    // The umpire can save through the RPC (idempotent overwrite of r1).
+    const save = await request.post(`${supabaseUrl}/rest/v1/rpc/upsert_umpire_result`, {
+      headers: jsonHeaders(umpire),
+      data: {
+        p_tie_id: RLS_TIE,
+        p_rubber_index: 1,
+        p_games: [
+          { a: 11, b: 5 },
+          { a: 11, b: 7 }
+        ],
+        p_walkover: false,
+        p_walkover_side: null
+      }
+    })
+    expect(save.ok()).toBeTruthy()
+
+    // A manager calling the RPC is refused — the role boundary is server-side.
+    const asManager = await request.post(`${supabaseUrl}/rest/v1/rpc/upsert_umpire_result`, {
+      headers: jsonHeaders(manager),
+      data: {
+        p_tie_id: RLS_TIE,
+        p_rubber_index: 1,
+        p_games: [{ a: 0, b: 0 }],
+        p_walkover: false,
+        p_walkover_side: null
+      }
+    })
+    expect(asManager.ok()).toBeFalsy()
+
+    // Manager read/write split: reads their tournament's results, cannot write.
+    const mgrRead = await request.get(
+      `${supabaseUrl}/rest/v1/rubber_results?tie_id=eq.${RLS_TIE}`,
+      { headers: jsonHeaders(manager) }
+    )
+    expect(mgrRead.ok()).toBeTruthy()
+    const mgrRows = (await mgrRead.json()) as { rubber_index: number; games: unknown }[]
+    expect(mgrRows.length).toBeGreaterThanOrEqual(1)
+
+    const mgrWrite = await request.patch(
+      `${supabaseUrl}/rest/v1/rubber_results?tie_id=eq.${RLS_TIE}&rubber_index=eq.1`,
+      { headers: jsonHeaders(manager), data: { games: [{ a: 0, b: 0 }] } }
+    )
+    expect(mgrWrite.ok()).toBeTruthy() // RLS silently filters — no error
+    const after = await request.get(
+      `${supabaseUrl}/rest/v1/rubber_results?tie_id=eq.${RLS_TIE}&rubber_index=eq.1`,
+      { headers: jsonHeaders(admin) }
+    )
+    const afterRow = ((await after.json()) as { games: { a: number }[] }[])[0]
+    expect(afterRow.games[0].a).toBe(11) // unchanged — the write was inert
+
+    // Cross-tournament denial: the umpire sees nothing of another tournament.
+    await request.post(`${supabaseUrl}/rest/v1/tournaments`, {
+      headers: upsertHeaders,
+      data: [{ id: 'e2e-tour-rls', name: 'E2E RLS Other' }]
+    })
+    const other = await request.get(
+      `${supabaseUrl}/rest/v1/ties?tournament_id=eq.e2e-tour-rls`,
+      { headers: jsonHeaders(umpire) }
+    )
+    expect((await other.json()) as unknown[]).toEqual([])
+
+    // Player identity immutability: even after the lineup changes, an umpire
+    // update keeps the stored players (the update set never touches player_ids).
+    await request.patch(
+      `${supabaseUrl}/rest/v1/lineups?tie_id=eq.${RLS_TIE}&team_id=eq.e2e-a`,
+      { headers: jsonHeaders(admin), data: { player_ids: [['e2e-p7'], ['e2e-p7'], ['e2e-p7']] } }
+    )
+    const resave = await request.post(`${supabaseUrl}/rest/v1/rpc/upsert_umpire_result`, {
+      headers: jsonHeaders(umpire),
+      data: {
+        p_tie_id: RLS_TIE,
+        p_rubber_index: 1,
+        p_games: [
+          { a: 11, b: 5 },
+          { a: 11, b: 7 }
+        ],
+        p_walkover: false,
+        p_walkover_side: null
+      }
+    })
+    expect(resave.ok()).toBeTruthy()
+    const reread = await request.get(
+      `${supabaseUrl}/rest/v1/rubber_results?tie_id=eq.${RLS_TIE}&rubber_index=eq.1`,
+      { headers: jsonHeaders(admin) }
+    )
+    const row = ((await reread.json()) as { player_ids: [string[], string[]] }[])[0]
+    expect(row.player_ids[0]).toEqual(['e2e-p2']) // the ORIGINAL lineup selection
+    expect(row.player_ids[1]).toEqual(['e2e-p5'])
+  })
 })

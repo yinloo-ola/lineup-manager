@@ -12,6 +12,9 @@ export interface GameScore {
 
 export type Side = 'a' | 'b'
 
+/** The best-of every tie imports with; the admin may override per tie. */
+export const DEFAULT_BEST_OF = 5
+
 /** Majority of a best-of-N: the first side to reach it wins. */
 export function bestOfMajority(bestOf: number): number {
   return Math.ceil(bestOf / 2)
@@ -19,16 +22,16 @@ export function bestOfMajority(bestOf: number): number {
 
 /**
  * The winner of one rubber: the first side to the best-of majority of games.
- * A walkover is decided immediately (its side, default a). Undecided → null.
- * Pure.
+ * A walkover is decided immediately — but only when its side is recorded: a
+ * side-less walkover is UNDECIDED, never a silent default win. Pure.
  */
 export function rubberWinner(
   games: GameScore[],
   bestOf: number,
   walkover = false,
-  walkoverSide: Side = 'a'
+  walkoverSide?: Side | null
 ): Side | null {
-  if (walkover) return walkoverSide
+  if (walkover) return walkoverSide ?? null
   let a = 0
   let b = 0
   const majority = bestOfMajority(bestOf)
@@ -39,6 +42,30 @@ export function rubberWinner(
     if (b >= majority) return 'b'
   }
   return null
+}
+
+/** The derived state of one tie's results — never stored, computed per read. */
+export interface TieResultState {
+  state: 'partial' | 'decided'
+  winnerSide?: Side
+}
+
+/**
+ * The single derivation of a tie's result from its stored rubber results,
+ * shared by the umpire console and the Matches dashboard so the winner
+ * semantics can never drift between the two surfaces. `results` must carry the
+ * tie's entered rubbers; unplayed rubbers count for neither side. Pure.
+ */
+export function deriveTieResult(
+  results: { rubberIndex: number; games: GameScore[]; walkover: boolean; walkoverSide?: Side | null }[],
+  bestOf: number,
+  rubberCount: number
+): TieResultState {
+  if (rubberCount <= 0 || results.length === 0) return { state: 'partial' }
+  const entered = [...results].sort((x, y) => x.rubberIndex - y.rubberIndex)
+  const winners = entered.map((r) => rubberWinner(r.games, bestOf, r.walkover, r.walkoverSide))
+  const winner = tieWinner(winners, rubberCount)
+  return winner === null ? { state: 'partial' } : { state: 'decided', winnerSide: winner }
 }
 
 /**
