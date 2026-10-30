@@ -14,6 +14,7 @@ import {
 } from '@/domain/umpireView'
 import type { GameScore, Side } from '@/domain/results'
 import UmpireEntryDialog from '@/components/UmpireEntryDialog.vue'
+import ThemeToggle from '@/components/ThemeToggle.vue'
 
 const auth = useAuthStore()
 const rows = ref<UmpireTieRow[]>([])
@@ -230,6 +231,9 @@ onMounted(load)
       <v-card-item>
         <v-card-title>Umpire console</v-card-title>
         <v-card-subtitle v-if="tournamentName">{{ tournamentName }}</v-card-subtitle>
+        <template #append>
+          <ThemeToggle />
+        </template>
       </v-card-item>
       <v-divider />
       <v-card-text>

@@ -9,6 +9,7 @@ import { useAuthStore } from '@/stores/auth'
 import { useTournamentStore } from '@/stores/tournament'
 import { isFormatFrozen } from '@/domain/formatFreeze'
 import TournamentSelector from '@/components/TournamentSelector.vue'
+import ThemeToggle from '@/components/ThemeToggle.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -91,6 +92,7 @@ async function onSignOut(): Promise<void> {
       <v-spacer />
       <TournamentSelector v-if="hasTournament" />
       <template #append>
+        <ThemeToggle />
         <v-btn variant="text" prepend-icon="mdi-logout" @click="onSignOut">Sign out</v-btn>
       </template>
     </v-app-bar>
