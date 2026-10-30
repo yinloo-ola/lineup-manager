@@ -14,7 +14,12 @@ function defaultStorage(): Pick<Storage, 'getItem' | 'setItem'> | undefined {
 export function loadThemePreference(
   storage: Pick<Storage, 'getItem'> = defaultStorage()
 ): ThemeName {
-  const value = storage?.getItem(KEY) ?? null
+  let value: string | null = null
+  try {
+    value = storage?.getItem(KEY) ?? null
+  } catch {
+    // Privacy modes can throw on read — fall back to light rather than break boot.
+  }
   return value === 'ttDark' ? 'ttDark' : 'ttLight'
 }
 
@@ -31,7 +36,7 @@ export function saveThemePreference(
   }
 }
 
-/** The html[data-theme] marker the CSS tokens key on. */
+/** The html[data-theme] marker mirrored from the active theme (E2E asserts it; CSS may key on it). */
 export function themeMarker(theme: ThemeName): 'light' | 'dark' {
   return theme === 'ttDark' ? 'dark' : 'light'
 }

@@ -17,6 +17,7 @@ import {
   classifySlots,
   computeWindow,
   deriveSlots,
+  sortSlotTies,
   type ScheduleSlot
 } from '@/domain/scheduleWindow'
 import {
@@ -128,7 +129,12 @@ const FILTERS: { value: MatchFilter; label: string }[] = [
 // a mid-session failure keeps the last good data on screen.
 const loadedOnce = ref(false)
 usePolling(async () => {
-  await Promise.all([load(), loadResultsSupport()])
+  await Promise.all([
+    load(),
+    loadResultsSupport().catch((e) => {
+      console.error('dashboard poll (contexts) failed:', (e as Error).message)
+    })
+  ])
   loadedOnce.value = true
 })
 
@@ -159,6 +165,7 @@ function adminCard(m: MatchRow): MatchCardTie {
     tally: m.tally,
     winnerName: m.winnerName,
     admin: true,
+    resultsAvailable: resultsEligible(m),
     sides: m.sides.map((s) => ({
       teamName: s.teamName,
       status: s.status,
@@ -187,10 +194,12 @@ function dayPrefix(start: Date): string {
 }
 
 const slotRows = computed(() => {
+  // The window shapes the WHOLE schedule; filters narrow within sections —
+  // a search can never reshape what "now" means (venue-ux R5).
   const slots = deriveSlots(
-    filtered.value.map((m) => ({ tieId: m.tieId, scheduledStart: m.scheduledStart }))
+    matches.value.map((m) => ({ tieId: m.tieId, scheduledStart: m.scheduledStart }))
   )
-  const byTie = new Map(filtered.value.map((m) => [m.tieId, m]))
+  const byTie = new Map(matches.value.map((m) => [m.tieId, m]))
   const windowIdx = computeWindow(slots, new Date())
   const classified = showAll.value
     ? { windowed: slots.map((_, i) => i), shelved: [] as number[] }
@@ -198,11 +207,12 @@ const slotRows = computed(() => {
 
   const section = (slotIdx: number, isCurrent: boolean): DashboardSlotRows => {
     const slot: ScheduleSlot = slots[slotIdx]
-    const tableOf = (id: string): number => Number(byTie.get(id)?.table) || 9999
-    const rows = slot.tieIds
-      .map((id) => byTie.get(id))
-      .filter((m): m is MatchRow => m !== undefined)
-      .sort((a, b) => tableOf(a.tieId) - tableOf(b.tieId))
+    const rows = sortSlotTies(
+      slot.tieIds
+        .map((id) => byTie.get(id))
+        .filter((m): m is MatchRow => m !== undefined)
+        .filter((m) => matchMatchesEvent(m, categoryId.value) && matchMatchesFilter(m, filter.value))
+    )
     const cards = rows.map((row) => ({ tie: adminCard(row), row }))
     return { slotIdx, label: slot.label, day: dayPrefix(slot.start), isCurrent, cards }
   }
@@ -215,7 +225,9 @@ const slotRows = computed(() => {
 })
 
 function fmt(iso: string | null): string {
-  return iso === null ? '—' : new Date(iso).toLocaleString()
+  // Scheduled starts are tournament-local ISO stored with a UTC offset — render
+  // them in UTC so card times agree with the slot headings on any device.
+  return iso === null ? '—' : new Date(iso).toLocaleString(undefined, { timeZone: 'UTC' })
 }
 
 /** group · round metadata parts, shown where the seed provides them. */
@@ -237,6 +249,7 @@ async function load(): Promise<void> {
   try {
     matches.value = await fetchMatches(supabase, tournaments.activeId)
     loadedOnce.value = true
+    errorMessage.value = null
   } catch (e) {
     if (!loadedOnce.value) errorMessage.value = (e as Error).message
     else console.error('dashboard poll failed:', (e as Error).message)

@@ -7,8 +7,9 @@ import { loadThemePreference, themeMarker } from './themes/themePreference'
 import './assets/main.css'
 
 // Adopt the persisted theme before mount so first paint matches the choice.
-vuetify.theme.global.name.value = loadThemePreference()
-document.documentElement.dataset.theme = themeMarker(loadThemePreference())
+const themePreference = loadThemePreference()
+vuetify.theme.global.name.value = themePreference
+document.documentElement.dataset.theme = themeMarker(themePreference)
 
 const app = createApp(App)
 app.use(createPinia())

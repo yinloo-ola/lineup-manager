@@ -15,6 +15,8 @@ export interface MatchCardTie {
   tally?: [number, number]
   winnerName?: string
   admin?: boolean
+  /** False hides the admin Results button (knockout / TBD-side rows). */
+  resultsAvailable?: boolean
   sides?: { teamName: string; status: string; needsAttention: boolean }[]
   isKnockout?: boolean
 }
@@ -111,7 +113,7 @@ function sideLabel(status: string): string {
           Lineups pending
         </v-chip>
         <v-spacer />
-        <v-btn v-if="tie.admin" size="small" variant="tonal" data-testid="card-results" @click.stop="emit('results')">
+        <v-btn v-if="tie.admin && tie.resultsAvailable !== false" size="small" variant="tonal" data-testid="card-results" @click.stop="emit('results')">
           Results
         </v-btn>
       </template>
@@ -119,7 +121,7 @@ function sideLabel(status: string): string {
       <template v-else>
         <v-chip size="small" variant="tonal" prepend-icon="mdi-calendar-clock">Scheduled</v-chip>
         <v-spacer />
-        <v-btn v-if="tie.admin" size="small" variant="tonal" data-testid="card-results" @click.stop="emit('results')">
+        <v-btn v-if="tie.admin && tie.resultsAvailable !== false" size="small" variant="tonal" data-testid="card-results" @click.stop="emit('results')">
           Results
         </v-btn>
       </template>
@@ -137,6 +139,10 @@ function sideLabel(status: string): string {
 }
 .match-card.is-decided {
   opacity: 0.72;
+}
+/* Venue screens are used on tablets/phones — keep the foot actions 44px tall. */
+.match-card :deep(.v-btn) {
+  min-height: 44px;
 }
 .table-chip {
   font-weight: 700;

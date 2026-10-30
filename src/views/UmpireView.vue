@@ -15,6 +15,7 @@ import {
   classifySlots,
   computeWindow,
   deriveSlots,
+  sortSlotTies,
   type ScheduleSlot
 } from '@/domain/scheduleWindow'
 import type { GameScore, Side } from '@/domain/results'
@@ -46,6 +47,12 @@ function matchesEvent(r: UmpireTieRow): boolean {
   return r.categoryName === categories.value.find((c) => c.id === eventFilter.value)?.name
 }
 
+function matchesQuery(r: UmpireTieRow): boolean {
+  const q = searchQuery.value.trim().toLowerCase()
+  if (!q) return true
+  return `${r.teamAName} ${r.teamBName} ${r.categoryName ?? ''}`.toLowerCase().includes(q)
+}
+
 // --- the timeslot working window (venue-ux R3/R4) ---
 const showAll = ref(false)
 const searchQuery = ref('')
@@ -55,17 +62,7 @@ const searchQuery = ref('')
 const loadedOnce = ref(false)
 usePolling(async () => {
   await load()
-  loadedOnce.value = true
 })
-
-const filteredRows = computed(() =>
-  rows.value.filter((r) => {
-    if (!matchesEvent(r)) return false
-    const q = searchQuery.value.trim().toLowerCase()
-    if (!q) return true
-    return `${r.teamAName} ${r.teamBName} ${r.categoryName ?? ''}`.toLowerCase().includes(q)
-  })
-)
 
 interface SlotRows {
   slotIdx: number
@@ -86,10 +83,12 @@ function dayPrefix(start: Date): string {
 }
 
 const slotRows = computed(() => {
+  // The window shapes the WHOLE schedule; filters narrow within sections —
+  // a search can never reshape what "now" means (venue-ux R5).
   const slots = deriveSlots(
-    filteredRows.value.map((r) => ({ tieId: r.tieId, scheduledStart: r.scheduledStart }))
+    rows.value.map((r) => ({ tieId: r.tieId, scheduledStart: r.scheduledStart }))
   )
-  const byTie = new Map(filteredRows.value.map((r) => [r.tieId, r]))
+  const byTie = new Map(rows.value.map((r) => [r.tieId, r]))
   const windowIdx = computeWindow(slots, new Date())
   const classified = showAll.value
     ? { windowed: slots.map((_, i) => i), shelved: [] as number[] }
@@ -97,16 +96,18 @@ const slotRows = computed(() => {
 
   const section = (slotIdx: number, isCurrent: boolean): SlotRows => {
     const slot: ScheduleSlot = slots[slotIdx]
-    const tableOf = (id: string): number => Number(byTie.get(id)?.table) || 9999
     return {
       slotIdx,
       label: slot.label,
       day: dayPrefix(slot.start),
       isCurrent,
-      rows: slot.tieIds
-        .map((id) => byTie.get(id))
-        .filter((r): r is UmpireTieRow => r !== undefined)
-        .sort((a, b) => tableOf(a.tieId) - tableOf(b.tieId))
+      rows: sortSlotTies(
+        slot.tieIds
+          .map((id) => byTie.get(id))
+          .filter((r): r is UmpireTieRow => r !== undefined)
+          .filter(matchesEvent)
+          .filter(matchesQuery)
+      )
     }
   }
 
@@ -161,11 +162,12 @@ const entryPlayers = ref<[string[], string[]][]>([])
 const entryStored = ref<{ games: GameScore[]; walkover: boolean; walkoverSide: Side | null }[]>([])
 
 function fmt(iso: string | null): string {
-  return iso === null ? '—' : new Date(iso).toLocaleString()
+  // Scheduled starts are tournament-local ISO stored with a UTC offset — render
+  // them in UTC so card times agree with the slot headings on any device.
+  return iso === null ? '—' : new Date(iso).toLocaleString(undefined, { timeZone: 'UTC' })
 }
 
 async function load(): Promise<void> {
-  errorMessage.value = null
   const tournamentId = auth.umpireTournamentId
   if (!tournamentId) {
     errorMessage.value = 'This account is not bound to a tournament.'
@@ -270,6 +272,8 @@ async function load(): Promise<void> {
         walkoverSide: (r.walkover_side as Side | null) ?? undefined
       }))
     })
+    loadedOnce.value = true
+    errorMessage.value = null
   } catch (e) {
     // First load failure is an error state; a poll failure keeps the last
     // good data and only logs.

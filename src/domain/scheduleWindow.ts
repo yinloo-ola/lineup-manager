@@ -44,14 +44,16 @@ export function deriveSlots(ties: SchedulableTie[]): ScheduleSlot[] {
     .sort((a, b) => a.start.getTime() - b.start.getTime())
 
   const slots: ScheduleSlot[] = []
+  let prevStart: number | null = null
   for (const t of timed) {
+    const gapMin = prevStart === null ? Infinity : (t.start.getTime() - prevStart) / 60_000
     const last = slots[slots.length - 1]
-    const gapMin = last ? (t.start.getTime() - last.start.getTime()) / 60_000 : Infinity
     if (last && gapMin <= SLOT_GAP_MINUTES) {
       last.tieIds.push(t.tieId)
     } else {
       slots.push({ label: hhmm(t.start), start: t.start, tieIds: [t.tieId] })
     }
+    prevStart = t.start.getTime()
   }
   return slots
 }
@@ -93,6 +95,23 @@ export function computeWindow(
     last = i
   }
   return { first: current, last }
+}
+
+/**
+ * In-slot ordering: by actual scheduled start, then table (venue-ux R4's
+ * time-then-table rule inside a clustered slot — referee shifts make the
+ * starts differ within one slot). Pure.
+ */
+export function sortSlotTies<T extends { scheduledStart: string | null; table?: string }>(
+  rows: T[]
+): T[] {
+  const tableOf = (t: T): number => (t.table != null && Number.isFinite(Number(t.table)) ? Number(t.table) : Number.POSITIVE_INFINITY)
+  return [...rows].sort((a, b) => {
+    const ta = a.scheduledStart ?? ''
+    const tb = b.scheduledStart ?? ''
+    if (ta !== tb) return ta < tb ? -1 : 1
+    return tableOf(a) - tableOf(b)
+  })
 }
 
 /**
