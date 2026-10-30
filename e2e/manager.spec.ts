@@ -30,7 +30,8 @@ test.describe('manager flow', () => {
     // Opponent's roster is NOT visible (RLS isolation).
     await expect(page.getByText('Bob')).toHaveCount(0)
 
-    // Own tie is visible, showing the opponent's team name.
-    await expect(page.getByText(/vs Bravo/)).toBeVisible()
+    // Own tie is visible, showing the opponent's team name. Other slices add
+    // more Bravo ties to the shared fixture tournament — .first(), not strict.
+    await expect(page.getByText(/vs Bravo/).first()).toBeVisible()
   })
 })

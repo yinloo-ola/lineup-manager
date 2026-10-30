@@ -82,7 +82,10 @@ const resultsOpen = ref(false)
 const resultsEligible = (m: MatchRow): boolean =>
   !m.isKnockout && m.sides.every((s) => s.teamId !== null)
 
-function openResults(m: MatchRow): void {
+async function openResults(m: MatchRow): Promise<void> {
+  // The dialog renders from the loaded contexts; under a cold parallel load
+  // they may not be in yet — fetch before opening rather than showing a shell.
+  if (!resultContexts.value.size) await loadResultsSupport()
   resultsTie.value = m
   resultsOpen.value = true
 }

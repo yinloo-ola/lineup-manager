@@ -200,6 +200,15 @@ test.describe.serial('venue-ux (feature acceptance)', () => {
     page,
     request
   }) => {
+    // Reset this test's own prior submission — a previous run left the Bravo
+    // lineup submitted, which would flip the card to ready before the poll.
+    const admin0 = await apiToken(request, TEST_ADMIN_EMAIL, TEST_ADMIN_PASSWORD)
+    const reset = await request.patch(
+      `${supabaseUrl}/rest/v1/lineups?tie_id=eq.${T1330}&team_id=eq.e2e-b`,
+      { headers: authHeaders(admin0), data: { status: 'not-started' } }
+    )
+    expect(reset.ok()).toBeTruthy()
+
     await page.clock.install({ time: NOW })
     await page.goto('/login')
     await page.getByRole('textbox', { name: /email/i }).fill(TEST_UMPIRE_EMAIL)
