@@ -199,10 +199,10 @@ async function signInUmpire(page: Page): Promise<void> {
   await expect(page).toHaveURL(/\/umpire$/)
 }
 
-/** Fill one game row (side A / side B points) inside a rubber's section. */
-async function fillGame(page: Page, rubber: number, game: number, a: number, b: number): Promise<void> {
-  await page.getByRole('spinbutton', { name: `Rubber ${rubber} game ${game} side A` }).fill(String(a))
-  await page.getByRole('spinbutton', { name: `Rubber ${rubber} game ${game} side B` }).fill(String(b))
+/** Fill one game row (side A / side B points) inside a match's section. */
+async function fillGame(page: Page, match: number, game: number, a: number, b: number): Promise<void> {
+  await page.getByRole('spinbutton', { name: `Match ${match} game ${game} side A` }).fill(String(a))
+  await page.getByRole('spinbutton', { name: `Match ${match} game ${game} side B` }).fill(String(b))
 }
 
 test.describe('results entry (feature acceptance)', () => {
@@ -227,15 +227,15 @@ test.describe('results entry (feature acceptance)', () => {
       .first()
     await openRow.getByRole('button', { name: /enter results|edit results/i }).click()
     for (const [game, [a, b]] of RES_GAMES_A_WINS.entries()) {
-      if (game > 0) await page.getByRole('button', { name: 'Rubber 1 add game' }).click()
+      if (game > 0) await page.getByRole('button', { name: 'Match 1 add game' }).click()
       await fillGame(page, 1, game + 1, a, b)
     }
     for (const [game, [a, b]] of RES_GAMES_C_WINS.entries()) {
-      if (game > 0) await page.getByRole('button', { name: 'Rubber 3 add game' }).click()
+      if (game > 0) await page.getByRole('button', { name: 'Match 3 add game' }).click()
       await fillGame(page, 3, game + 1, a, b)
     }
-    await page.getByRole('checkbox', { name: 'Rubber 2 walkover' }).check()
-    await page.getByRole('radio', { name: 'Rubber 2 walkover side A' }).check()
+    await page.getByRole('checkbox', { name: 'Match 2 walkover' }).check()
+    await page.getByRole('radio', { name: 'Match 2 walkover side A' }).check()
 
     await page.getByRole('button', { name: /save results/i }).click()
     await expect(page.getByText(/Decided · Alpha/).first()).toBeVisible()
@@ -261,13 +261,13 @@ test.describe('results entry (feature acceptance)', () => {
     const dlg = page.getByRole('dialog')
     for (const [game, [a, b]] of RES_GAMES_FLIPPED.entries()) {
       await dlg
-        .getByRole('spinbutton', { name: `Rubber 1 game ${game + 1} side A` })
+        .getByRole('spinbutton', { name: `Match 1 game ${game + 1} side A` })
         .fill(String(a))
       await dlg
-        .getByRole('spinbutton', { name: `Rubber 1 game ${game + 1} side B` })
+        .getByRole('spinbutton', { name: `Match 1 game ${game + 1} side B` })
         .fill(String(b))
     }
-    await dlg.getByLabel('Rubber 1 side A player').click({ force: true })
+    await dlg.getByLabel('Match 1 side A player').click({ force: true })
     await page.getByRole('option', { name: 'Adam', exact: true }).last().click()
     await dlg.getByRole('button', { name: /save results/i }).click()
     await expect(dlg).not.toBeVisible()

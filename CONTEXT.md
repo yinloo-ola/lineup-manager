@@ -25,7 +25,7 @@ A team-versus-team fixture within a team event, composed of several matches. Agr
 _Avoid_: tie, fixture, rubber-set
 
 **Match**:
-One individual discipline contest within a team match (e.g. Men's Singles, Mixed Doubles), with its own player constraints. Played as best-of-N games.
+One individual discipline contest within a team match (e.g. Men's Singles, Mixed Doubles), with its own player constraints. Played as best-of-N games — best of 5 games in a match by default, and best of 5 matches in a team match. (Owner's ruling, 2026-10-30: never say "rubber".)
 _Avoid_: rubber, game, slot
 
 **Bracket Slot**:

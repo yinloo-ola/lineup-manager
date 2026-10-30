@@ -203,7 +203,7 @@ async function onSave(): Promise<void> {
               <v-text-field
                 v-model="g.a"
                 type="number"
-                :label="`Rubber ${i + 1} game ${gi + 1} side A`"
+                :label="`Match ${i + 1} game ${gi + 1} side A`"
                 density="compact"
                 hide-details
                 style="max-width: 110px"
@@ -212,7 +212,7 @@ async function onSave(): Promise<void> {
               <v-text-field
                 v-model="g.b"
                 type="number"
-                :label="`Rubber ${i + 1} game ${gi + 1} side B`"
+                :label="`Match ${i + 1} game ${gi + 1} side B`"
                 density="compact"
                 hide-details
                 style="max-width: 110px"
@@ -222,7 +222,7 @@ async function onSave(): Promise<void> {
               size="small"
               variant="text"
               prepend-icon="mdi-plus"
-              :aria-label="`Rubber ${i + 1} add game`"
+              :aria-label="`Match ${i + 1} add game`"
               @click="addGame(i)"
             >
               Add game
@@ -239,8 +239,8 @@ async function onSave(): Promise<void> {
               item-value="id"
               :label="
                 r.playersA.length > 1
-                  ? `Rubber ${i + 1} side A player ${pi + 1}`
-                  : `Rubber ${i + 1} side A player`
+                  ? `Match ${i + 1} side A player ${pi + 1}`
+                  : `Match ${i + 1} side A player`
               "
               density="compact"
               hide-details
@@ -255,8 +255,8 @@ async function onSave(): Promise<void> {
               item-value="id"
               :label="
                 r.playersB.length > 1
-                  ? `Rubber ${i + 1} side B player ${pi + 1}`
-                  : `Rubber ${i + 1} side B player`
+                  ? `Match ${i + 1} side B player ${pi + 1}`
+                  : `Match ${i + 1} side B player`
               "
               density="compact"
               hide-details
@@ -267,7 +267,7 @@ async function onSave(): Promise<void> {
           <div class="d-flex align-center ga-4 mt-2">
             <v-checkbox
               v-model="r.walkover"
-              :label="`Rubber ${i + 1} walkover`"
+              :label="`Match ${i + 1} walkover`"
               density="compact"
               hide-details
             />
@@ -278,8 +278,8 @@ async function onSave(): Promise<void> {
               hide-details
               density="compact"
             >
-              <v-radio :value="'a'" :label="`Rubber ${i + 1} walkover side A`" />
-              <v-radio :value="'b'" :label="`Rubber ${i + 1} walkover side B`" />
+              <v-radio :value="'a'" :label="`Match ${i + 1} walkover side A`" />
+              <v-radio :value="'b'" :label="`Match ${i + 1} walkover side B`" />
             </v-radio-group>
           </div>
 

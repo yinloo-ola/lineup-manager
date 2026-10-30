@@ -188,7 +188,7 @@ const canSave = computed(() => !saving.value)
               <v-text-field
                 v-model="g.a"
                 type="number"
-                :label="`Rubber ${i + 1} game ${gi + 1} side A`"
+                :label="`Match ${i + 1} game ${gi + 1} side A`"
                 density="compact"
                 hide-details
                 style="max-width: 110px"
@@ -197,7 +197,7 @@ const canSave = computed(() => !saving.value)
               <v-text-field
                 v-model="g.b"
                 type="number"
-                :label="`Rubber ${i + 1} game ${gi + 1} side B`"
+                :label="`Match ${i + 1} game ${gi + 1} side B`"
                 density="compact"
                 hide-details
                 style="max-width: 110px"
@@ -207,7 +207,7 @@ const canSave = computed(() => !saving.value)
               size="small"
               variant="text"
               prepend-icon="mdi-plus"
-              :aria-label="`Rubber ${i + 1} add game`"
+              :aria-label="`Match ${i + 1} add game`"
               @click="addGame(i)"
             >
               Add game
@@ -217,7 +217,7 @@ const canSave = computed(() => !saving.value)
           <div class="d-flex align-center ga-4 mt-1">
             <v-checkbox
               v-model="r.walkover"
-              :label="`Rubber ${i + 1} walkover`"
+              :label="`Match ${i + 1} walkover`"
               density="compact"
               hide-details
             />
@@ -228,8 +228,8 @@ const canSave = computed(() => !saving.value)
               hide-details
               density="compact"
             >
-              <v-radio :value="'a'" :label="`Rubber ${i + 1} walkover side A`" />
-              <v-radio :value="'b'" :label="`Rubber ${i + 1} walkover side B`" />
+              <v-radio :value="'a'" :label="`Match ${i + 1} walkover side A`" />
+              <v-radio :value="'b'" :label="`Match ${i + 1} walkover side B`" />
             </v-radio-group>
           </div>
 

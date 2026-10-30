@@ -107,7 +107,7 @@ export function validateGames(
     if (a >= majority || b >= majority) {
       violations.push({
         kind: 'best-of-overflow',
-        message: `The rubber was decided at game ${i} — best of ${bestOf} ends at ${majority} game wins.`,
+        message: `The match was decided at game ${i + 1} — best of ${bestOf} ends at ${majority} game wins.`,
         rubberIndex: i
       })
       continue
