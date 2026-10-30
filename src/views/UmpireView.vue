@@ -20,6 +20,7 @@ import {
 import type { GameScore, Side } from '@/domain/results'
 import UmpireEntryDialog from '@/components/UmpireEntryDialog.vue'
 import ThemeToggle from '@/components/ThemeToggle.vue'
+import { usePolling } from '@/composables/polling'
 import MatchCard, { type MatchCardTie } from '@/components/MatchCard.vue'
 import SlotSection from '@/components/SlotSection.vue'
 import ShelvedPanel from '@/components/ShelvedPanel.vue'
@@ -48,6 +49,14 @@ function matchesEvent(r: UmpireTieRow): boolean {
 // --- the timeslot working window (venue-ux R3/R4) ---
 const showAll = ref(false)
 const searchQuery = ref('')
+
+// Venue freshness (venue-ux R7): poll the same load every 20s while visible;
+// a mid-session failure keeps the last good data on screen.
+const loadedOnce = ref(false)
+usePolling(async () => {
+  await load()
+  loadedOnce.value = true
+})
 
 const filteredRows = computed(() =>
   rows.value.filter((r) => {
@@ -262,7 +271,10 @@ async function load(): Promise<void> {
       }))
     })
   } catch (e) {
-    errorMessage.value = (e as Error).message
+    // First load failure is an error state; a poll failure keeps the last
+    // good data and only logs.
+    if (!loadedOnce.value) errorMessage.value = (e as Error).message
+    else console.error('umpire poll failed:', (e as Error).message)
   } finally {
     loading.value = false
   }

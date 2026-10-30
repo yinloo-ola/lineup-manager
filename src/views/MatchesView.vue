@@ -29,6 +29,7 @@ import MatchCard, { type MatchCardTie } from '@/components/MatchCard.vue'
 import MatchStatusChips from '@/components/MatchStatusChips.vue'
 import SlotSection from '@/components/SlotSection.vue'
 import ShelvedPanel from '@/components/ShelvedPanel.vue'
+import { usePolling } from '@/composables/polling'
 import AdminResultsDialog from '@/components/AdminResultsDialog.vue'
 
 const tournaments = useTournamentStore()
@@ -119,6 +120,14 @@ const FILTERS: { value: MatchFilter; label: string }[] = [
   { value: 'submitted', label: 'Submitted' },
   { value: 'past-cutoff', label: 'Past cutoff' }
 ]
+
+// Venue freshness (venue-ux R7): poll the same load every 20s while visible;
+// a mid-session failure keeps the last good data on screen.
+const loadedOnce = ref(false)
+usePolling(async () => {
+  await Promise.all([load(), loadResultsSupport()])
+  loadedOnce.value = true
+})
 
 const filtered = computed(() =>
   matches.value.filter((m) => matchMatchesEvent(m, categoryId.value) && matchMatchesFilter(m, filter.value))
@@ -221,12 +230,13 @@ function metadata(m: MatchRow): string {
 }
 
 async function load(): Promise<void> {
-  errorMessage.value = null
   if (!tournaments.activeId) return
   try {
     matches.value = await fetchMatches(supabase, tournaments.activeId)
+    loadedOnce.value = true
   } catch (e) {
-    errorMessage.value = (e as Error).message
+    if (!loadedOnce.value) errorMessage.value = (e as Error).message
+    else console.error('dashboard poll failed:', (e as Error).message)
   }
 }
 

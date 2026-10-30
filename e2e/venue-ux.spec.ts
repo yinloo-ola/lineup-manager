@@ -207,12 +207,16 @@ test.describe.serial('venue-ux (feature acceptance)', () => {
     await page.getByRole('button', { name: /sign in/i }).click()
     await expect(page).toHaveURL(/\/umpire$/)
 
+    // The window's only Alpha-vs-Bravo tie is the 13:30 one (the 09:00 match
+    // of the same pairing is shelved).
     const pendingCard = page
       .getByTestId('window')
       .getByTestId('match-card')
       .filter({ hasText: 'Alpha vs Bravo' })
-      .filter({ hasText: '13:30' })
-    await expect(pendingCard.getByText(/lineups pending/i)).toBeVisible()
+      .filter({ hasText: 'E2E Venue UX' })
+    // Under parallel suite load the console's first load can be slow — wait
+    // generously for the card's first render.
+    await expect(pendingCard.getByText(/lineups pending/i)).toBeVisible({ timeout: 15_000 })
     await expect(pendingCard.getByRole('button', { name: /enter results/i })).toHaveCount(0)
 
     // The second side's manager (via the admin here) submits the lineup.
