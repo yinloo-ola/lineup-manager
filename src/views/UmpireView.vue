@@ -21,8 +21,24 @@ const tournamentName = ref<string | null>(null)
 const errorMessage = ref<string | null>(null)
 const loading = ref(true)
 
-// Raw inputs the display rows don't carry but the entry dialog needs —
-// kept out of buildUmpireTieRows, which is pure and renders only the list.
+// The team event filter (null = all events): at a big venue an umpire scores
+// one event at a time — the column keeps the context, the filter cuts noise.
+const categories = ref<{ id: string; name: string }[]>([])
+const eventFilter = ref<string | null>(null)
+
+const eventOptions = computed(() => [
+  { id: null, name: 'All team events' },
+  ...categories.value
+])
+
+function matchesEvent(r: UmpireTieRow): boolean {
+  if (eventFilter.value === null) return true
+  return r.categoryName === categories.value.find((c) => c.id === eventFilter.value)?.name
+}
+
+const openRows = computed(() => rows.value.filter((r) => r.entryOpen && matchesEvent(r)))
+const lockedRows = computed(() => rows.value.filter((r) => !r.entryOpen && matchesEvent(r)))
+
 const data = reactive({
   tieTeamIds: new Map<string, [string, string]>(),
   lineups: [] as {
@@ -37,11 +53,8 @@ const data = reactive({
   storedByTie: new Map<
     string,
     ({ games: GameScore[]; walkover: boolean; walkoverSide: Side | null } | undefined)[]
-  >()
-})
-
-const openRows = computed(() => rows.value.filter((r) => r.entryOpen))
-const lockedRows = computed(() => rows.value.filter((r) => !r.entryOpen))
+    >()
+  })
 
 // --- the entry dialog ---
 const entryOpen = ref(false)
@@ -70,7 +83,7 @@ async function load(): Promise<void> {
     return
   }
   try {
-    const [tiesRes, lineupsRes, teamsRes, playersRes, formatsRes, resultsRes, tourRes] =
+    const [tiesRes, lineupsRes, teamsRes, playersRes, formatsRes, resultsRes, tourRes, catsRes] =
       await Promise.all([
         supabase
           .from('ties')
@@ -90,12 +103,17 @@ async function load(): Promise<void> {
           .from('rubber_results')
           .select('tie_id, rubber_index, games, walkover, walkover_side')
           .eq('tournament_id', tournamentId),
-        supabase.from('tournaments').select('name').eq('id', tournamentId).maybeSingle()
+        supabase.from('tournaments').select('name').eq('id', tournamentId).maybeSingle(),
+        supabase.from('categories').select('id, name').eq('tournament_id', tournamentId).order('name')
       ])
-    for (const r of [tiesRes, lineupsRes, teamsRes, playersRes, formatsRes, resultsRes, tourRes]) {
+    for (const r of [tiesRes, lineupsRes, teamsRes, playersRes, formatsRes, resultsRes, tourRes, catsRes]) {
       if (r.error) throw r.error
     }
     tournamentName.value = (tourRes.data as { name: string } | null)?.name ?? null
+    const categoryNameById = new Map(
+      ((catsRes.data as { id: string; name: string }[]) ?? []).map((c) => [c.id, c.name])
+    )
+    categories.value = (catsRes.data as { id: string; name: string }[]) ?? []
 
     const ties = (tiesRes.data as Record<string, unknown>[]) ?? []
     const rubberCountByCategory = new Map<string, number>()
@@ -141,7 +159,8 @@ async function load(): Promise<void> {
         scheduledStart: (t.scheduled_start as string | null) ?? null,
         table: (t.table_label as string | null) ?? undefined,
         teamIds: [t.team_a as string | null, t.team_b as string | null],
-        isKnockout: (t.is_knockout as boolean | null) ?? false
+        isKnockout: (t.is_knockout as boolean | null) ?? false,
+        categoryName: categoryNameById.get(t.category_id as string)
       })),
       lineups: lineups.map((l) => ({
         tieId: l.tieId,
@@ -217,14 +236,28 @@ onMounted(load)
         <div v-if="loading" class="text-body-2">Loading…</div>
 
         <template v-else>
-          <p class="text-body-2 text-medium-emphasis mb-3">
-            Enter results for a team match once both lineups are submitted.
-          </p>
+          <div class="d-flex align-center ga-4 mb-3 flex-wrap">
+            <p class="text-body-2 text-medium-emphasis mb-0">
+              Enter results for a team match once both lineups are submitted.
+            </p>
+            <v-spacer />
+            <v-select
+              v-model="eventFilter"
+              :items="eventOptions"
+              item-title="name"
+              item-value="id"
+              label="Team event"
+              density="compact"
+              hide-details
+              style="max-width: 260px"
+            />
+          </div>
 
           <v-table v-if="openRows.length" density="comfortable">
             <thead>
               <tr>
                 <th>Scheduled</th>
+                <th>Team event</th>
                 <th>Table</th>
                 <th>Teams</th>
                 <th>State</th>
@@ -234,6 +267,7 @@ onMounted(load)
             <tbody>
               <tr v-for="r in openRows" :key="r.tieId">
                 <td>{{ fmt(r.scheduledStart) }}</td>
+                <td>{{ r.categoryName ?? '—' }}</td>
                 <td>{{ r.table ?? '—' }}</td>
                 <td>{{ r.teamAName }} vs {{ r.teamBName }}</td>
                 <td>{{ stateLabel(r) }}</td>
@@ -258,6 +292,7 @@ onMounted(load)
               <thead>
                 <tr>
                   <th>Scheduled</th>
+                  <th>Team event</th>
                   <th>Table</th>
                   <th>Teams</th>
                   <th></th>
@@ -266,6 +301,7 @@ onMounted(load)
               <tbody>
                 <tr v-for="r in lockedRows" :key="r.tieId">
                   <td>{{ fmt(r.scheduledStart) }}</td>
+                  <td>{{ r.categoryName ?? '—' }}</td>
                   <td>{{ r.table ?? '—' }}</td>
                   <td>{{ r.teamAName }} vs {{ r.teamBName }}</td>
                   <td>
@@ -282,6 +318,7 @@ onMounted(load)
     <UmpireEntryDialog
       v-model="entryOpen"
       :tie-id="entryTie?.tieId ?? ''"
+      :event-name="entryTie?.categoryName ?? ''"
       :team-a-name="entryTie?.teamAName ?? ''"
       :team-b-name="entryTie?.teamBName ?? ''"
       :best-of="entryBestOf"

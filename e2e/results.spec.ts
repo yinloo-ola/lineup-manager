@@ -217,9 +217,15 @@ test.describe('results entry (feature acceptance)', () => {
     const gateRow = page.locator('tr, li').filter({ hasText: 'lineup not submitted' })
     await expect(gateRow.first()).toBeVisible()
 
-    // Open the entry tie and score it: r1 Alpha in 3 games, r2 walkover Alpha,
-    // r3 Charlie in 3 games → Alpha 2–1.
-    await page.getByRole('button', { name: /enter results/i }).first().click()
+    // Open THIS spec's entry tie — never .first(), because other specs' ties
+    // (e.g. the invalidation fixture) can also be entry-open and sort earlier.
+    const openRow = page
+      .locator('tr')
+      .filter({ has: page.getByRole('button', { name: /enter results|edit results/i }) })
+      .filter({ hasText: 'Alpha vs Charlie' })
+      .filter({ hasText: 'E2E Results' })
+      .first()
+    await openRow.getByRole('button', { name: /enter results|edit results/i }).click()
     for (const [game, [a, b]] of RES_GAMES_A_WINS.entries()) {
       if (game > 0) await page.getByRole('button', { name: 'Rubber 1 add game' }).click()
       await fillGame(page, 1, game + 1, a, b)

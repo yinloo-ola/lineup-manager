@@ -14,6 +14,8 @@ export interface UmpireTieInput {
   teamIds: [string | null, string | null]
   /** Knockout ties are outside slice 1's entry surface. */
   isKnockout?: boolean
+  /** The team event's display name — every row names its event. */
+  categoryName?: string
 }
 
 export interface UmpireLineupInput {
@@ -38,6 +40,8 @@ export interface UmpireTieRow {
   teamBName: string
   scheduledStart: string | null
   table?: string
+  /** The team event this match belongs to. */
+  categoryName?: string
   /** True when both sides have a submitted lineup — the entry gate. */
   entryOpen: boolean
   state: 'locked' | 'not-entered' | 'partial' | 'decided'
@@ -104,6 +108,7 @@ export function buildUmpireTieRows(args: {
         teamBName,
         scheduledStart: t.scheduledStart,
         table: t.table,
+        categoryName: t.categoryName,
         entryOpen,
         state,
         ...(winnerSide !== undefined ? { winnerSide, winnerName } : {})

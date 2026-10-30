@@ -30,6 +30,8 @@ interface StoredRubber {
 const props = defineProps<{
   modelValue: boolean
   tieId: string
+  /** The team event's display name, shown with the match for context. */
+  eventName?: string
   teamAName: string
   teamBName: string
   bestOf: number
@@ -164,7 +166,10 @@ const canSave = computed(() => !saving.value)
     <v-card rounded="lg">
       <v-card-item>
         <v-card-title>{{ teamAName }} vs {{ teamBName }}</v-card-title>
-        <v-card-subtitle>Best of {{ bestOf }} games per match</v-card-subtitle>
+        <v-card-subtitle>
+          <template v-if="eventName">{{ eventName }} · </template>Best of {{ bestOf }} games per
+          match
+        </v-card-subtitle>
       </v-card-item>
       <v-card-text>
         <v-alert v-if="serverError" type="error" variant="tonal" density="compact" class="mb-3">

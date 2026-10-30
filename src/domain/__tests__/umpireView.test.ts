@@ -40,7 +40,7 @@ describe('buildUmpireTieRows', () => {
 
   it('opens when both sides submitted and shows team display names', () => {
     const rows = buildUmpireTieRows({
-      ties: [baseTie],
+      ties: [{ ...baseTie, categoryName: "Men's Team" }],
       lineups: [
         { tieId: 't1', teamId: 'a', status: 'submitted' },
         { tieId: 't1', teamId: 'b', status: 'submitted' }
@@ -51,6 +51,7 @@ describe('buildUmpireTieRows', () => {
     expect(rows[0].state).toBe('not-entered')
     expect(rows[0].teamAName).toBe('Alpha')
     expect(rows[0].teamBName).toBe('Bravo')
+    expect(rows[0].categoryName).toBe("Men's Team")
   })
 
   it('excludes knockout ties and null-sided ties', () => {
