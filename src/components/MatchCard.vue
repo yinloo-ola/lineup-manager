@@ -7,6 +7,7 @@ export interface MatchCardTie {
   table?: string
   time?: string
   categoryName?: string
+  categoryId?: string
   teamAName: string
   teamBName: string
   state: 'ready' | 'decided' | 'pending' | 'scheduled'
@@ -20,15 +21,6 @@ export interface MatchCardTie {
 
 const props = defineProps<{ tie: MatchCardTie }>()
 const emit = defineEmits<{ enter: []; results: [] }>()
-
-const stateChip =
-  props.tie.state === 'decided'
-    ? { icon: 'mdi-check', text: 'Decided', color: 'success' }
-    : props.tie.state === 'pending'
-      ? { icon: 'mdi-hourglass', text: 'Lineups pending', color: 'warning' }
-      : props.tie.state === 'scheduled'
-        ? { icon: 'mdi-calendar-clock', text: 'Scheduled', color: undefined }
-        : null
 
 function sideLabel(status: string): string {
   if (status === 'submitted') return 'in'
@@ -48,6 +40,18 @@ function sideLabel(status: string): string {
       <span v-if="tie.table" class="table-chip">Table {{ tie.table }}</span>
       <span v-if="tie.time" class="font-weight-medium">{{ tie.time }}</span>
       <span v-if="tie.categoryName">{{ tie.categoryName }}</span>
+      <v-spacer />
+      <v-btn
+        v-if="tie.isKnockout && tie.categoryId"
+        size="x-small"
+        variant="text"
+        prepend-icon="mdi-git"
+        data-testid="card-bracket"
+        :to="{ name: 'bracket', params: { categoryId: tie.categoryId } }"
+        @click.stop
+      >
+        Bracket
+      </v-btn>
     </div>
 
     <div class="teams text-body-1 font-weight-bold">
@@ -60,7 +64,7 @@ function sideLabel(status: string): string {
         <v-icon size="x-small" :color="s.status === 'submitted' ? 'success' : s.status === 'missed-cutoff' ? 'error' : 'grey'">
           {{ s.status === 'submitted' ? 'mdi-check-circle' : s.status === 'missed-cutoff' ? 'mdi-alert-circle' : 'mdi-circle-outline' }}
         </v-icon>
-        {{ s.teamName }} · {{ sideLabel(s.status) }}
+        {{ s.teamName }} · {{ s.needsAttention ? 'Needs attention' : sideLabel(s.status) }}
         <v-icon v-if="s.needsAttention" size="x-small" color="warning">mdi-alert</v-icon>
       </span>
     </div>
@@ -78,11 +82,11 @@ function sideLabel(status: string): string {
           size="small"
           variant="tonal"
           data-testid="edit-results"
-          @click="emit('enter')"
+          @click.stop="emit('enter')"
         >
           Edit results
         </v-btn>
-        <v-btn v-else size="small" variant="tonal" data-testid="card-results" @click="emit('results')">
+        <v-btn v-else size="small" variant="tonal" data-testid="card-results" @click.stop="emit('results')">
           Results
         </v-btn>
       </template>
@@ -90,11 +94,15 @@ function sideLabel(status: string): string {
       <template v-else-if="tie.state === 'ready'">
         <v-spacer />
         <v-btn
+          v-if="!tie.admin"
           color="primary"
           data-testid="enter-results"
-          @click="emit('enter')"
+          @click.stop="emit('enter')"
         >
           Enter results
+        </v-btn>
+        <v-btn v-else size="small" variant="tonal" data-testid="card-results" @click.stop="emit('results')">
+          Results
         </v-btn>
       </template>
 
@@ -103,7 +111,7 @@ function sideLabel(status: string): string {
           Lineups pending
         </v-chip>
         <v-spacer />
-        <v-btn v-if="tie.admin" size="small" variant="tonal" data-testid="card-results" @click="emit('results')">
+        <v-btn v-if="tie.admin" size="small" variant="tonal" data-testid="card-results" @click.stop="emit('results')">
           Results
         </v-btn>
       </template>
@@ -111,17 +119,8 @@ function sideLabel(status: string): string {
       <template v-else>
         <v-chip size="small" variant="tonal" prepend-icon="mdi-calendar-clock">Scheduled</v-chip>
         <v-spacer />
-        <v-btn v-if="tie.admin" size="small" variant="tonal" data-testid="card-results" @click="emit('results')">
+        <v-btn v-if="tie.admin" size="small" variant="tonal" data-testid="card-results" @click.stop="emit('results')">
           Results
-        </v-btn>
-        <v-btn
-          v-if="tie.isKnockout"
-          size="small"
-          variant="text"
-          prepend-icon="mdi-git"
-          data-testid="card-bracket"
-        >
-          Bracket
         </v-btn>
       </template>
     </div>

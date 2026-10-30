@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test'
-import { apiToken, authHeaders, supabaseUrl } from './helpers'
+import { apiToken, authHeaders, expandShelf, supabaseUrl } from './helpers'
 import { TEST_ADMIN_EMAIL, TEST_ADMIN_PASSWORD, TEST_MANAGER2_EMAIL, TEST_MANAGER2_NEW_PASSWORD } from './global-setup'
 
 // Ticket #13: the app is tournament-aware. The administrator switches tournament from
@@ -28,6 +28,7 @@ test.describe('multi-tournament', () => {
 
     await page.goto('/admin/lineups')
     // "Default" holds the global-setup fixture (Alpha has a submitted lineup).
+    await expandShelf(page)
     await expect(page.getByText('Alpha').first()).toBeVisible()
 
     // Switch to the other tournament — its lineups view re-scopes to empty.

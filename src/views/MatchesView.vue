@@ -13,15 +13,23 @@ import {
   type TieResultContext
 } from '@/services/resultsService'
 import { fetchAdminScopeData } from '@/services/adminScope'
-import AdminResultsDialog from '@/components/AdminResultsDialog.vue'
+import {
+  classifySlots,
+  computeWindow,
+  deriveSlots,
+  type ScheduleSlot
+} from '@/domain/scheduleWindow'
 import {
   matchMatchesEvent,
   matchMatchesFilter,
-  matchMissesCutoff,
   type MatchFilter,
   type MatchRow
 } from '@/domain/matchesDashboard'
+import MatchCard, { type MatchCardTie } from '@/components/MatchCard.vue'
 import MatchStatusChips from '@/components/MatchStatusChips.vue'
+import SlotSection from '@/components/SlotSection.vue'
+import ShelvedPanel from '@/components/ShelvedPanel.vue'
+import AdminResultsDialog from '@/components/AdminResultsDialog.vue'
 
 const tournaments = useTournamentStore()
 const matches = ref<MatchRow[]>([])
@@ -116,6 +124,84 @@ const filtered = computed(() =>
   matches.value.filter((m) => matchMatchesEvent(m, categoryId.value) && matchMatchesFilter(m, filter.value))
 )
 
+// --- the timeslot card model (venue-ux R6): same window/shelf as the console ---
+const showAll = ref(false)
+
+function adminCard(m: MatchRow): MatchCardTie {
+  return {
+    tieId: m.tieId,
+    table: m.table,
+    time: fmt(m.scheduledStart),
+    categoryName: m.categoryName,
+    categoryId: m.categoryId,
+    teamAName: m.sides[0].teamName,
+    teamBName: m.sides[1].teamName,
+    state:
+      m.resultState === 'decided'
+        ? 'decided'
+        : m.sides.every((s) => s.status === 'submitted')
+          ? 'ready'
+          : m.isKnockout
+            ? 'scheduled'
+            : 'pending',
+    tally: m.tally,
+    winnerName: m.winnerName,
+    admin: true,
+    sides: m.sides.map((s) => ({
+      teamName: s.teamName,
+      status: s.status,
+      needsAttention: s.needsAttention
+    })),
+    isKnockout: m.isKnockout
+  }
+}
+
+interface DashboardSlotRows {
+  slotIdx: number
+  label: string
+  day: string
+  isCurrent: boolean
+  cards: { tie: MatchCardTie; row: MatchRow }[]
+}
+
+function dayPrefix(start: Date): string {
+  const today = new Date()
+  const sameDay =
+    start.getUTCFullYear() === today.getUTCFullYear() &&
+    start.getUTCMonth() === today.getUTCMonth() &&
+    start.getUTCDate() === today.getUTCDate()
+  if (sameDay) return ''
+  return start.toLocaleDateString(undefined, { day: 'numeric', month: 'short', timeZone: 'UTC' }) + ' · '
+}
+
+const slotRows = computed(() => {
+  const slots = deriveSlots(
+    filtered.value.map((m) => ({ tieId: m.tieId, scheduledStart: m.scheduledStart }))
+  )
+  const byTie = new Map(filtered.value.map((m) => [m.tieId, m]))
+  const windowIdx = computeWindow(slots, new Date())
+  const classified = showAll.value
+    ? { windowed: slots.map((_, i) => i), shelved: [] as number[] }
+    : classifySlots(slots, windowIdx)
+
+  const section = (slotIdx: number, isCurrent: boolean): DashboardSlotRows => {
+    const slot: ScheduleSlot = slots[slotIdx]
+    const tableOf = (id: string): number => Number(byTie.get(id)?.table) || 9999
+    const rows = slot.tieIds
+      .map((id) => byTie.get(id))
+      .filter((m): m is MatchRow => m !== undefined)
+      .sort((a, b) => tableOf(a.tieId) - tableOf(b.tieId))
+    const cards = rows.map((row) => ({ tie: adminCard(row), row }))
+    return { slotIdx, label: slot.label, day: dayPrefix(slot.start), isCurrent, cards }
+  }
+
+  return {
+    windowed: classified.windowed.map((i) => section(i, i === windowIdx.first)),
+    shelved: classified.shelved.map((i) => section(i, false)),
+    shelvedCount: classified.shelved.reduce((n, i) => n + (slots[i]?.tieIds.length ?? 0), 0)
+  }
+})
+
 function fmt(iso: string | null): string {
   return iso === null ? '—' : new Date(iso).toLocaleString()
 }
@@ -206,69 +292,53 @@ onMounted(async () => {
 
       <v-card elevation="2" rounded="lg" class="mt-4">
         <v-card-text>
-          <v-table v-if="filtered.length" density="comfortable">
-            <thead>
-              <tr>
-                <th>Scheduled</th>
-                <!-- Only when events are mixed — scoped to one event the column
-                     would repeat that event's name on every row. -->
-                <th v-if="categoryId === null">Team event</th>
-                <th>Table</th>
-                <th>Group · Round</th>
-                <th colspan="2">Teams</th>
-                <th>Result</th>
-                <th></th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr
-                v-for="m in filtered"
-                :key="m.tieId"
-                :class="{ 'missed-cutoff-row': matchMissesCutoff(m) }"
-                class="match-row"
-                @click="selected = m"
+          <div v-if="filtered.length" data-testid="dashboard-cards">
+            <div data-testid="window">
+              <template v-if="slotRows.windowed.length">
+                <SlotSection
+                  v-for="s in slotRows.windowed"
+                  :key="s.slotIdx"
+                  :label="s.label"
+                  :day="s.day"
+                  :meta="s.isCurrent ? 'Now' : undefined"
+                >
+                  <MatchCard
+                    v-for="c in s.cards"
+                    :key="c.tie.tieId"
+                    :tie="c.tie"
+                    @results="openResults(c.row)"
+                    @click="selected = c.row"
+                  />
+                </SlotSection>
+              </template>
+              <p v-else class="text-body-2">No team matches in the working window.</p>
+              <v-btn
+                v-if="!showAll && slotRows.windowed.length === 0 && slotRows.shelvedCount > 0"
+                variant="tonal"
+                class="mt-2"
+                @click="showAll = true"
               >
-                <td>
-                  {{ fmt(m.scheduledStart) }}
-                  <v-chip v-if="m.locked" size="small" variant="outlined" class="ml-2">Locked</v-chip>
-                </td>
-                <td v-if="categoryId === null">{{ m.categoryName }}</td>
-                <td>{{ m.table ?? '—' }}</td>
-                <td>{{ groupRoundParts(m).join(' · ') || '—' }}</td>
-                <td v-for="s in m.sides" :key="s.teamId ?? 'tbd'">
-                  <div class="d-flex flex-wrap align-center ga-2">
-                    <span>{{ s.teamName }}</span>
-                    <MatchStatusChips :side="s" />
-                  </div>
-                </td>
-                <td>
-                  <span v-if="m.resultState === 'decided'" class="text-body-2">
-                    Decided · {{ m.winnerName }}
-                  </span>
-                  <span v-else-if="m.resultState === 'partial'" class="text-body-2 text-medium-emphasis">
-                    Partly entered
-                  </span>
-                </td>
-                <td>
-                  <v-btn
-                    v-if="m.isKnockout"
-                    size="x-small"
-                    variant="text"
-                    @click.stop
-                    :to="{ name: 'bracket', params: { categoryId: m.categoryId } }"
-                  >Bracket</v-btn>
-                  <v-btn
-                    v-if="resultsEligible(m)"
-                    size="x-small"
-                    variant="tonal"
-                    color="primary"
-                    class="ml-1"
-                    @click.stop="openResults(m)"
-                  >Results</v-btn>
-                </td>
-              </tr>
-            </tbody>
-          </v-table>
+                Show all matches
+              </v-btn>
+            </div>
+
+            <ShelvedPanel v-if="slotRows.shelved.length" :count="slotRows.shelvedCount">
+              <SlotSection
+                v-for="s in slotRows.shelved"
+                :key="s.slotIdx"
+                :label="s.label"
+                :day="s.day"
+              >
+                <MatchCard
+                  v-for="c in s.cards"
+                  :key="c.tie.tieId"
+                  :tie="c.tie"
+                  @results="openResults(c.row)"
+                  @click="selected = c.row"
+                />
+              </SlotSection>
+            </ShelvedPanel>
+          </div>
           <p v-else class="text-body-2">No team matches for this filter.</p>
         </v-card-text>
       </v-card>

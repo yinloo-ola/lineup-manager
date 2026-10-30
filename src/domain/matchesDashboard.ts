@@ -68,6 +68,8 @@ export interface MatchRow {
   resultState?: 'partial' | 'decided'
   /** The derived winner's display name once decided. */
   winnerName?: string
+  /** Rubbers won per side whenever results exist — the card's match tally. */
+  tally?: [number, number]
 }
 
 export type MatchFilter = 'all' | 'not-submitted' | 'submitted' | 'past-cutoff'
@@ -232,14 +234,17 @@ function deriveResultState(
   results: DashboardResultInput[],
   rubberCount: number,
   teamNameById: Map<string, string>
-): Pick<MatchRow, 'resultState' | 'winnerName'> {
+): Pick<MatchRow, 'resultState' | 'winnerName' | 'tally'> {
   if (results.length === 0 || (tie.isKnockout ?? false)) return {}
   if (tie.teamIds[0] === null || tie.teamIds[1] === null) return {}
   if (rubberCount === 0) return {}
   const derived = deriveTieResult(results, tie.bestOf ?? DEFAULT_BEST_OF, rubberCount)
-  if (derived.state === 'partial' || !derived.winnerSide) return { resultState: 'partial' }
+  if (derived.state === 'partial' || !derived.winnerSide) {
+    return { resultState: 'partial', tally: derived.tally }
+  }
   return {
     resultState: 'decided',
+    tally: derived.tally,
     winnerName: sideDisplayName(
       derived.winnerSide === 'a' ? tie.teamIds[0] : tie.teamIds[1],
       teamNameById

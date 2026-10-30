@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test'
-import { apiToken, deleteLineup } from './helpers'
+import { apiToken, deleteLineup, expandShelf } from './helpers'
 import { TEST_ADMIN_EMAIL, TEST_ADMIN_PASSWORD } from './global-setup'
 
 // Ticket 8: the administrator oversight surface. The admin sees every team's
@@ -28,6 +28,7 @@ test.describe('administrator dashboard + overwrite', () => {
     // The fixture table lists one row per team match (the pre-created Alpha
     // lineup guarantees a Submitted chip in Alpha's row).
     await page.goto('/admin/lineups')
+    await expandShelf(page)
     await expect(page.getByText('Alpha').first()).toBeVisible()
     await expect(page.getByText('Submitted').first()).toBeVisible()
 

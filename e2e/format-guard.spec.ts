@@ -1,5 +1,5 @@
 import { test, expect, type Page } from '@playwright/test'
-import { apiToken, authHeaders, signInAdmin, supabaseUrl } from './helpers'
+import { apiToken, authHeaders, expandShelf, signInAdmin, supabaseUrl } from './helpers'
 import { TEST_ADMIN_EMAIL, TEST_ADMIN_PASSWORD } from './global-setup'
 
 // Ticket #16: the guarded pre-start format edit + the freeze (spec §6). Uses
@@ -131,6 +131,7 @@ test.describe.serial('format guard + freeze (#16)', () => {
     await expect(page.getByText(/Saved 1 match/)).toBeVisible()
 
     await page.goto('/matches')
+    await expandShelf(page)
     await expect(page.getByText('Needs attention').first()).toBeVisible()
   })
 

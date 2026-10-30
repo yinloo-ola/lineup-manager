@@ -1,5 +1,5 @@
 import { test, expect, type APIRequestContext, type Page } from '@playwright/test'
-import { apiToken, authHeaders, supabaseAnonKey, supabaseUrl } from './helpers'
+import { apiToken, authHeaders, expandShelf, supabaseAnonKey, supabaseUrl } from './helpers'
 import {
   DEFAULT_TOURNAMENT_ID,
   TEST_ADMIN_EMAIL,
@@ -211,19 +211,21 @@ test.describe('results entry (feature acceptance)', () => {
   }) => {
     await signInUmpire(page)
 
-    // The entry tie is open; the gate tie is locked with its reason (scenario 2's
-    // visible half is asserted here in passing on the same list).
-    await expect(page.getByText('Alpha vs Charlie').first()).toBeVisible()
-    const gateRow = page.locator('tr, li').filter({ hasText: 'lineup not submitted' })
-    await expect(gateRow.first()).toBeVisible()
+    // The entry tie is open; the gate tie is locked (both live far in the
+    // future — the shelf holds them; expand to reach their cards).
+    await expandShelf(page)
+    const gateCard = page
+      .getByTestId('match-card')
+      .filter({ hasText: 'E2E Results' })
+      .filter({ hasText: 'Table 7' })
+    await expect(gateCard.first()).toContainText('Lineups pending')
 
     // Open THIS spec's entry tie — never .first(), because other specs' ties
     // (e.g. the invalidation fixture) can also be entry-open and sort earlier.
     const openRow = page
-      .locator('tr')
-      .filter({ has: page.getByRole('button', { name: /enter results|edit results/i }) })
-      .filter({ hasText: 'Alpha vs Charlie' })
+      .getByTestId('match-card')
       .filter({ hasText: 'E2E Results' })
+      .filter({ hasText: 'Table 6' })
       .first()
     await openRow.getByRole('button', { name: /enter results|edit results/i }).click()
     for (const [game, [a, b]] of RES_GAMES_A_WINS.entries()) {
@@ -238,7 +240,13 @@ test.describe('results entry (feature acceptance)', () => {
     await page.getByRole('radio', { name: 'Match 2 walkover side A' }).check()
 
     await page.getByRole('button', { name: /save results/i }).click()
-    await expect(page.getByText(/Decided · Alpha/).first()).toBeVisible()
+    // The card flips to decided with the derived winner and tally.
+    const decidedCard = page
+      .getByTestId('match-card')
+      .filter({ hasText: 'E2E Results' })
+      .filter({ hasText: 'Table 6' })
+    await expect(decidedCard).toContainText('Alpha')
+    await expect(decidedCard).toContainText('2–1')
 
     // Admin override: flip r1's games to Charlie and swap r1 side A's player.
     // The umpire's session would redirect /login back to /umpire — drop it.
@@ -249,14 +257,15 @@ test.describe('results entry (feature acceptance)', () => {
     await page.getByRole('button', { name: /sign in/i }).click()
     await expect(page).toHaveURL(/\/matches$/)
 
-    // The dashboard sorts by scheduled time, so the 10:00 entry tie (RES_TIE)
-    // is the first Alpha-vs-Charlie row.
-    const resRow = page
-      .locator('tr')
-      .filter({ hasText: 'Alpha' })
-      .filter({ hasText: 'Charlie' })
+    // The fixture tie lives far in the future — outside the working window, so
+    // it shelves; expand to reach its card.
+    await expandShelf(page)
+    const resCard = page
+      .getByTestId('match-card')
+      .filter({ hasText: 'Alpha vs Charlie' })
+      .filter({ hasText: 'E2E Results' })
       .first()
-    await resRow.getByRole('button', { name: /results/i }).click()
+    await resCard.getByTestId('card-results').click()
 
     const dlg = page.getByRole('dialog')
     for (const [game, [a, b]] of RES_GAMES_FLIPPED.entries()) {
@@ -272,20 +281,32 @@ test.describe('results entry (feature acceptance)', () => {
     await dlg.getByRole('button', { name: /save results/i }).click()
     await expect(dlg).not.toBeVisible()
 
-    // The derived winner recomputed: Alpha's r1 flip makes it Charlie 2–1.
-    await expect(page.getByText(/Decided · Charlie/).first()).toBeVisible()
+    // The derived winner recomputed: Alpha's r1 flip makes it Charlie 2–1 —
+    // the card shows the winner and the new tally without any reload.
+    await expandShelf(page)
+    const updated = page
+      .getByTestId('match-card')
+      .filter({ hasText: 'Alpha vs Charlie' })
+      .filter({ hasText: 'E2E Results' })
+      .first()
+    await expect(updated).toContainText('Charlie')
+    await expect(updated).toContainText('1–2')
   })
 
   test('scenario 2: unsubmitted lineup locks entry — UI reason, server denial, zero rows', async ({
     request,
     page
   }) => {
-    // UI: the umpire list shows the gate tie locked with the reason and no
+    // UI: the umpire console shelves the gate tie (lineups pending) with no
     // entry button to press.
     await signInUmpire(page)
-    const gateRow = page.locator('tr, li').filter({ hasText: 'lineup not submitted' })
-    await expect(gateRow.first()).toBeVisible()
-    await expect(gateRow.first().getByRole('button', { name: /enter results/i })).toHaveCount(0)
+    await expandShelf(page)
+    const gateCard = page
+      .getByTestId('match-card')
+      .filter({ hasText: 'E2E Results' })
+      .filter({ hasText: 'Table 7' })
+    await expect(gateCard.first()).toContainText('Lineups pending')
+    await expect(gateCard.first().getByRole('button', { name: /enter results/i })).toHaveCount(0)
 
     // Server: a direct write as the umpire is refused and nothing persists.
     const umpire = await signIn(request, UMPIRE_EMAIL, UMPIRE_NEW_PASSWORD)

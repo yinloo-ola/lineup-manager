@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test'
-import { apiToken, authHeaders, supabaseAnonKey, supabaseUrl } from './helpers'
+import { apiToken, authHeaders, expandShelf, supabaseAnonKey, supabaseUrl } from './helpers'
 import { TEST_ADMIN_EMAIL, TEST_ADMIN_PASSWORD } from './global-setup'
 
 // Ticket #15: Tournament settings manages the SELECTED tournament (no list).
@@ -136,6 +136,7 @@ test.describe.serial('manage & delete tournaments (#15)', () => {
 
     // Active fell back to another tournament: Default's lineup (Alpha) is visible.
     await page.goto('/admin/lineups')
+    await expandShelf(page)
     await expect(page.getByText('Alpha').first()).toBeVisible()
   })
 })

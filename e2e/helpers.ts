@@ -69,6 +69,21 @@ export async function signInManager(page: Page, email: string, password: string)
 }
 
 /**
+ * The venue dashboard shelves matches outside the working window (current
+ * timeslot + next two). Fixture ties live far in the future/past, so specs
+ * that assert on dashboard cards expand the shelf first.
+ */
+export async function expandShelf(page: Page): Promise<void> {
+  const head = page.getByTestId('shelf').getByRole('button', { name: /shelved/i })
+  // The dashboard loads asynchronously — give the shelf a moment to render,
+  // but never hang on surfaces that legitimately have none.
+  await head.waitFor({ state: 'visible', timeout: 5000 }).catch(() => {})
+  if ((await head.count()) > 0 && (await head.getAttribute('aria-expanded')) === 'false') {
+    await head.click()
+  }
+}
+
+/**
  * Sign in as the administrator and land on the setup-aware landing surface:
  * Matches when a tournament exists (the global-setup fixtures guarantee one).
  */
