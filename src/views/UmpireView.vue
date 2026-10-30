@@ -8,13 +8,21 @@ import { supabase } from '@/lib/supabase'
 import { useAuthStore } from '@/stores/auth'
 import {
   buildUmpireTieRows,
-  LOCKED_REASON,
   type UmpireLineupInput,
   type UmpireTieRow
 } from '@/domain/umpireView'
+import {
+  classifySlots,
+  computeWindow,
+  deriveSlots,
+  type ScheduleSlot
+} from '@/domain/scheduleWindow'
 import type { GameScore, Side } from '@/domain/results'
 import UmpireEntryDialog from '@/components/UmpireEntryDialog.vue'
 import ThemeToggle from '@/components/ThemeToggle.vue'
+import MatchCard, { type MatchCardTie } from '@/components/MatchCard.vue'
+import SlotSection from '@/components/SlotSection.vue'
+import ShelvedPanel from '@/components/ShelvedPanel.vue'
 
 const auth = useAuthStore()
 const rows = ref<UmpireTieRow[]>([])
@@ -37,8 +45,86 @@ function matchesEvent(r: UmpireTieRow): boolean {
   return r.categoryName === categories.value.find((c) => c.id === eventFilter.value)?.name
 }
 
-const openRows = computed(() => rows.value.filter((r) => r.entryOpen && matchesEvent(r)))
-const lockedRows = computed(() => rows.value.filter((r) => !r.entryOpen && matchesEvent(r)))
+// --- the timeslot working window (venue-ux R3/R4) ---
+const showAll = ref(false)
+const searchQuery = ref('')
+
+const filteredRows = computed(() =>
+  rows.value.filter((r) => {
+    if (!matchesEvent(r)) return false
+    const q = searchQuery.value.trim().toLowerCase()
+    if (!q) return true
+    return `${r.teamAName} ${r.teamBName} ${r.categoryName ?? ''}`.toLowerCase().includes(q)
+  })
+)
+
+interface SlotRows {
+  slotIdx: number
+  label: string
+  day: string
+  isCurrent: boolean
+  rows: UmpireTieRow[]
+}
+
+function dayPrefix(start: Date): string {
+  const today = new Date()
+  const sameDay =
+    start.getUTCFullYear() === today.getUTCFullYear() &&
+    start.getUTCMonth() === today.getUTCMonth() &&
+    start.getUTCDate() === today.getUTCDate()
+  if (sameDay) return ''
+  return start.toLocaleDateString(undefined, { day: 'numeric', month: 'short', timeZone: 'UTC' }) + ' · '
+}
+
+const slotRows = computed(() => {
+  const slots = deriveSlots(
+    filteredRows.value.map((r) => ({ tieId: r.tieId, scheduledStart: r.scheduledStart }))
+  )
+  const byTie = new Map(filteredRows.value.map((r) => [r.tieId, r]))
+  const windowIdx = computeWindow(slots, new Date())
+  const classified = showAll.value
+    ? { windowed: slots.map((_, i) => i), shelved: [] as number[] }
+    : classifySlots(slots, windowIdx)
+
+  const section = (slotIdx: number, isCurrent: boolean): SlotRows => {
+    const slot: ScheduleSlot = slots[slotIdx]
+    const tableOf = (id: string): number => Number(byTie.get(id)?.table) || 9999
+    return {
+      slotIdx,
+      label: slot.label,
+      day: dayPrefix(slot.start),
+      isCurrent,
+      rows: slot.tieIds
+        .map((id) => byTie.get(id))
+        .filter((r): r is UmpireTieRow => r !== undefined)
+        .sort((a, b) => tableOf(a.tieId) - tableOf(b.tieId))
+    }
+  }
+
+  return {
+    windowed: classified.windowed.map((i) => section(i, i === windowIdx.first)),
+    shelved: classified.shelved.map((i) => section(i, false)),
+    shelvedCount: classified.shelved.reduce(
+      (n, i) => n + (slots[i]?.tieIds.length ?? 0),
+      0
+    )
+  }
+})
+
+/** Map a console row onto the card's display state. */
+function cardTie(r: UmpireTieRow): MatchCardTie {
+  return {
+    tieId: r.tieId,
+    table: r.table,
+    time: r.scheduledStart ? fmt(r.scheduledStart) : undefined,
+    categoryName: r.categoryName,
+    teamAName: r.teamAName,
+    teamBName: r.teamBName,
+    state: r.state === 'decided' ? 'decided' : r.entryOpen ? 'ready' : 'pending',
+    tally: r.tally,
+    winnerName: r.winnerName
+  }
+}
 
 const data = reactive({
   tieTeamIds: new Map<string, [string, string]>(),
@@ -67,12 +153,6 @@ const entryStored = ref<{ games: GameScore[]; walkover: boolean; walkoverSide: S
 
 function fmt(iso: string | null): string {
   return iso === null ? '—' : new Date(iso).toLocaleString()
-}
-
-function stateLabel(r: UmpireTieRow): string {
-  if (r.state === 'decided') return `Decided · ${r.winnerName}`
-  if (r.state === 'partial') return 'Partly entered'
-  return ''
 }
 
 async function load(): Promise<void> {
@@ -241,9 +321,15 @@ onMounted(load)
 
         <template v-else>
           <div class="d-flex align-center ga-4 mb-3 flex-wrap">
-            <p class="text-body-2 text-medium-emphasis mb-0">
-              Enter results for a team match once both lineups are submitted.
-            </p>
+            <v-text-field
+              v-model="searchQuery"
+              prepend-inner-icon="mdi-magnify"
+              label="Search player, team or event"
+              density="compact"
+              hide-details
+              clearable
+              style="max-width: 280px"
+            />
             <v-spacer />
             <v-select
               v-model="eventFilter"
@@ -257,64 +343,44 @@ onMounted(load)
             />
           </div>
 
-          <v-table v-if="openRows.length" density="comfortable">
-            <thead>
-              <tr>
-                <th>Scheduled</th>
-                <th>Team event</th>
-                <th>Table</th>
-                <th>Teams</th>
-                <th>State</th>
-                <th></th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr v-for="r in openRows" :key="r.tieId">
-                <td>{{ fmt(r.scheduledStart) }}</td>
-                <td>{{ r.categoryName ?? '—' }}</td>
-                <td>{{ r.table ?? '—' }}</td>
-                <td>{{ r.teamAName }} vs {{ r.teamBName }}</td>
-                <td>{{ stateLabel(r) }}</td>
-                <td class="text-right">
-                  <v-btn
-                    size="small"
-                    color="primary"
-                    variant="tonal"
-                    @click="openEntry(r)"
-                  >
-                    {{ r.state === 'decided' ? 'Edit results' : 'Enter results' }}
-                  </v-btn>
-                </td>
-              </tr>
-            </tbody>
-          </v-table>
-          <p v-else class="text-body-2">No team matches ready for entry.</p>
+          <div data-testid="window">
+            <template v-if="slotRows.windowed.length">
+              <SlotSection
+                v-for="s in slotRows.windowed"
+                :key="s.slotIdx"
+                :label="s.label"
+                :day="s.day"
+                :meta="s.isCurrent ? 'Now' : undefined"
+              >
+                <MatchCard
+                  v-for="r in s.rows"
+                  :key="r.tieId"
+                  :tie="cardTie(r)"
+                  @enter="openEntry(r)"
+                />
+              </SlotSection>
+            </template>
+            <p v-else class="text-body-2">No team matches in the working window.</p>
+            <v-btn
+              v-if="!showAll && slotRows.windowed.length === 0 && slotRows.shelvedCount > 0"
+              variant="tonal"
+              class="mt-2"
+              @click="showAll = true"
+            >
+              Show all matches
+            </v-btn>
+          </div>
 
-          <template v-if="lockedRows.length">
-            <div class="text-h6 mt-6 mb-2">Waiting for lineups</div>
-            <v-table density="comfortable">
-              <thead>
-                <tr>
-                  <th>Scheduled</th>
-                  <th>Team event</th>
-                  <th>Table</th>
-                  <th>Teams</th>
-                  <th></th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr v-for="r in lockedRows" :key="r.tieId">
-                  <td>{{ fmt(r.scheduledStart) }}</td>
-                  <td>{{ r.categoryName ?? '—' }}</td>
-                  <td>{{ r.table ?? '—' }}</td>
-                  <td>{{ r.teamAName }} vs {{ r.teamBName }}</td>
-                  <td>
-                    <v-chip size="small" variant="outlined" color="grey">{{ LOCKED_REASON }}</v-chip>
-                  </td>
-                </tr>
-              </tbody>
-            </v-table>
-          </template>
+          <ShelvedPanel v-if="slotRows.shelved.length" :count="slotRows.shelvedCount">
+            <SlotSection
+              v-for="s in slotRows.shelved"
+              :key="s.slotIdx"
+              :label="s.label"
+              :day="s.day"
+            >
+              <MatchCard v-for="r in s.rows" :key="r.tieId" :tie="cardTie(r)" @enter="openEntry(r)" />
+            </SlotSection>
+          </ShelvedPanel>
         </template>
       </v-card-text>
     </v-card>

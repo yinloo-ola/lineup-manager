@@ -48,6 +48,8 @@ export interface UmpireTieRow {
   /** Present once decided — the derived winner (never stored). */
   winnerSide?: Side
   winnerName?: string
+  /** Rubbers won per side whenever results exist — the on-screen tally. */
+  tally?: [number, number]
 }
 
 /** The reason shown on a locked row. */
@@ -84,6 +86,7 @@ export function buildUmpireTieRows(args: {
       let state: UmpireTieRow['state'] = entryOpen ? 'not-entered' : 'locked'
       let winnerSide: Side | undefined
       let winnerName: string | undefined
+      let tally: [number, number] | undefined
       if (entryOpen) {
         const rubberCount = args.rubberCountByTie?.get(t.tieId)
         const bestOf = args.bestOfByTie?.get(t.tieId) ?? DEFAULT_BEST_OF
@@ -92,6 +95,7 @@ export function buildUmpireTieRows(args: {
         )
         if (rubberCount !== undefined && entered.length > 0) {
           const derived = deriveTieResult(entered, bestOf, rubberCount)
+          tally = derived.tally
           if (derived.state === 'decided' && derived.winnerSide) {
             state = 'decided'
             winnerSide = derived.winnerSide
@@ -111,7 +115,8 @@ export function buildUmpireTieRows(args: {
         categoryName: t.categoryName,
         entryOpen,
         state,
-        ...(winnerSide !== undefined ? { winnerSide, winnerName } : {})
+        ...(winnerSide !== undefined ? { winnerSide, winnerName } : {}),
+        ...(tally !== undefined ? { tally } : {})
       }
     })
 }

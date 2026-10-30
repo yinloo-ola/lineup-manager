@@ -48,6 +48,8 @@ export function rubberWinner(
 export interface TieResultState {
   state: 'partial' | 'decided'
   winnerSide?: Side
+  /** Rubbers won per side — the on-screen match tally (e.g. 3–1). */
+  tally: [number, number]
 }
 
 /**
@@ -61,11 +63,24 @@ export function deriveTieResult(
   bestOf: number,
   rubberCount: number
 ): TieResultState {
-  if (rubberCount <= 0 || results.length === 0) return { state: 'partial' }
-  const entered = [...results].sort((x, y) => x.rubberIndex - y.rubberIndex)
-  const winners = entered.map((r) => rubberWinner(r.games, bestOf, r.walkover, r.walkoverSide))
-  const winner = tieWinner(winners, rubberCount)
-  return winner === null ? { state: 'partial' } : { state: 'decided', winnerSide: winner }
+  let tallyA = 0
+  let tallyB = 0
+  if (rubberCount > 0 && results.length > 0) {
+    const entered = [...results].sort((x, y) => x.rubberIndex - y.rubberIndex)
+    for (const winner of entered.map((r) =>
+      rubberWinner(r.games, bestOf, r.walkover, r.walkoverSide)
+    )) {
+      if (winner === 'a') tallyA += 1
+      else if (winner === 'b') tallyB += 1
+    }
+    const winner = tieWinner(entered.map((r) =>
+      rubberWinner(r.games, bestOf, r.walkover, r.walkoverSide)
+    ), rubberCount)
+    if (winner !== null) {
+      return { state: 'decided', winnerSide: winner, tally: [tallyA, tallyB] }
+    }
+  }
+  return { state: 'partial', tally: [tallyA, tallyB] }
 }
 
 /**

@@ -86,30 +86,52 @@ describe('deriveTieResult', () => {
     walkoverSide: null
   })
 
-  it('derives decided with the winner side', () => {
+  it('derives decided with the winner side and the match tally', () => {
     expect(deriveTieResult([decided('a'), { ...decided('a'), rubberIndex: 2 }], 5, 3)).toEqual({
       state: 'decided',
-      winnerSide: 'a'
+      winnerSide: 'a',
+      tally: [2, 0]
     })
   })
 
+  it('the tally counts every decided rubber, winner and loser', () => {
+    const result = deriveTieResult(
+      [
+        decided('a'),
+        { ...decided('a'), rubberIndex: 2 },
+        { ...decided('a'), rubberIndex: 3 },
+        { ...decided('b'), rubberIndex: 4 }
+      ],
+      5,
+      3
+    )
+    expect(result.state).toBe('decided')
+    expect(result.tally).toEqual([3, 1])
+  })
+
   it('derives partial when entered rubbers do not reach the majority', () => {
-    expect(deriveTieResult([decided('a')], 5, 3)).toEqual({ state: 'partial' })
+    expect(deriveTieResult([decided('a')], 5, 3)).toEqual({ state: 'partial', tally: [1, 0] })
   })
 
   it('counts a walkover for its recorded side only', () => {
     const walkoverA = { tieId: 't1', rubberIndex: 2, games: [], walkover: true, walkoverSide: 'a' as const }
     const sideless = { tieId: 't1', rubberIndex: 2, games: [], walkover: true, walkoverSide: null }
-    expect(deriveTieResult([decided('b'), walkoverA], 5, 3)).toEqual({ state: 'partial' })
+    expect(deriveTieResult([decided('b'), walkoverA], 5, 3)).toEqual({
+      state: 'partial',
+      tally: [1, 1]
+    })
     expect(
       deriveTieResult(
         [decided('b'), walkoverA, { ...decided('b'), rubberIndex: 3 }],
         5,
         3
       )
-    ).toEqual({ state: 'decided', winnerSide: 'b' })
+    ).toEqual({ state: 'decided', winnerSide: 'b', tally: [1, 2] })
     // A side-less walkover counts for neither side.
-    expect(deriveTieResult([decided('a'), sideless], 5, 3)).toEqual({ state: 'partial' })
+    expect(deriveTieResult([decided('a'), sideless], 5, 3)).toEqual({
+      state: 'partial',
+      tally: [1, 0]
+    })
   })
 })
 
