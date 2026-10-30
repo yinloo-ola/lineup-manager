@@ -56,11 +56,16 @@ export function deriveSlots(ties: SchedulableTie[]): ScheduleSlot[] {
   return slots
 }
 
+/** UTC midnight of a slot start — slots never window across a day boundary. */
+function startOfUtcDay(d: Date): number {
+  return Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate())
+}
+
 /**
  * The working window (venue-ux R3): the current slot is the latest one whose
- * start is at or before `now`; the window is that slot plus the next two.
- * Before the first slot, the first slot is current (nothing is live yet); the
- * window never extends past the last slot. Pure.
+ * start is at or before `now` (before the first slot, the first slot is
+ * current); the window is that slot plus the next two — but never across a
+ * day boundary, so day-two matches always shelve on day one. Pure.
  */
 export function computeWindow(
   slots: ScheduleSlot[],
@@ -68,15 +73,33 @@ export function computeWindow(
   lookahead = 2
 ): { first: number; last: number } {
   if (slots.length === 0) return { first: -1, last: -1 }
-  let current = slots.findIndex((s) => s.start.getTime() > now.getTime()) - 1
-  if (current < 0) current = slots.length - 1 // before the first slot, or after the last
-  return { first: current, last: Math.min(current + lookahead, slots.length - 1) }
+  const t = now.getTime()
+  let current: number
+  if (t < slots[0].start.getTime()) {
+    current = 0
+  } else {
+    current = slots.length - 1
+    for (let i = 0; i < slots.length; i += 1) {
+      if (slots[i].start.getTime() > t) {
+        current = i - 1
+        break
+      }
+    }
+  }
+  const day = startOfUtcDay(slots[current].start)
+  let last = current
+  for (let i = current + 1; i < slots.length && i <= current + lookahead; i += 1) {
+    if (startOfUtcDay(slots[i].start) !== day) break
+    last = i
+  }
+  return { first: current, last }
 }
 
 /**
  * Classification of the schedule against the window: which slot indexes are in
  * the window (rendered up top) and which are shelved (collapsible panel).
- * Pure.
+ * The show-all escape is the view's decision — it skips classification
+ * entirely rather than passing a "full" window. Pure.
  */
 export function classifySlots(
   slots: ScheduleSlot[],
@@ -85,7 +108,7 @@ export function classifySlots(
   const windowed: number[] = []
   const shelved: number[] = []
   slots.forEach((_, i) => {
-    if (window.first === -1 || (i >= window.first && i <= window.last)) windowed.push(i)
+    if (i >= window.first && i <= window.last) windowed.push(i)
     else shelved.push(i)
   })
   return { windowed, shelved }
