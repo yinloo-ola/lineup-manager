@@ -92,7 +92,7 @@ function sideLabel(status: string): string {
 
     <div class="d-flex align-center ga-2 mt-1 card-foot">
       <template v-if="tie.state === 'decided'">
-        <v-chip size="small" color="success" variant="tonal">Decided</v-chip>
+        <v-chip size="small" color="success" variant="tonal"><v-icon size="x-small" class="mr-1">mdi-check</v-icon>Decided</v-chip>
         <v-spacer />
         <v-btn
           v-if="!tie.admin"
