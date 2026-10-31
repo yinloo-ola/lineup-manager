@@ -291,19 +291,17 @@ async function onSave(): Promise<void> {
           <template v-if="eventName">{{ eventName }} · </template>Best of {{ bestOf }} games per
           match
         </v-card-subtitle>
-        <template #append>
-          <v-chip
-            v-if="outcomeText"
-            size="small"
-            :color="draftOutcome?.state === 'decided' ? 'success' : 'primary'"
-            variant="tonal"
-            :class="{ 'font-weight-bold': draftOutcome?.state === 'decided' }"
-            data-testid="draft-outcome"
-          >
-            {{ outcomeText }}
-          </v-chip>
-        </template>
       </v-card-item>
+      <div v-if="outcomeText" class="px-4 pt-1" data-testid="draft-outcome">
+        <v-chip
+          size="small"
+          :color="draftOutcome?.state === 'decided' ? 'success' : 'primary'"
+          variant="tonal"
+          :class="{ 'font-weight-bold': draftOutcome?.state === 'decided' }"
+        >
+          {{ outcomeText }}
+        </v-chip>
+      </div>
       <v-card-text>
         <v-alert v-if="serverError" type="error" variant="tonal" density="compact" class="mb-3">
           {{ serverError }}
@@ -447,8 +445,8 @@ async function onSave(): Promise<void> {
 }
 .score-grid {
   display: grid;
-  grid-template-columns: 70px minmax(72px, 110px) 16px minmax(72px, 110px) 32px;
-  column-gap: 8px;
+  grid-template-columns: minmax(52px, 70px) minmax(64px, 1fr) 14px minmax(64px, 1fr) 28px;
+  column-gap: 6px;
   row-gap: 6px;
   align-items: center;
 }
