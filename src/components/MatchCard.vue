@@ -92,7 +92,7 @@ function sideLabel(status: string): string {
 
     <div class="d-flex align-center ga-2 mt-1 card-foot">
       <template v-if="tie.state === 'decided'">
-        <v-chip size="small" color="success" variant="tonal" prepend-icon="mdi-check">Decided</v-chip>
+        <v-chip size="small" color="success" variant="tonal">Decided</v-chip>
         <v-spacer />
         <v-btn
           v-if="!tie.admin"
@@ -126,11 +126,11 @@ function sideLabel(status: string): string {
       <template v-else-if="tie.state === 'pending'">
         <!-- Waiting state: the gate refuses results anyway — the card's action
              is the detail dialog (chase / fill the lineup on behalf). -->
-        <v-chip size="small" color="warning" variant="tonal" prepend-icon="mdi-hourglass">Lineups pending</v-chip>
+        <v-chip size="small" color="warning" variant="tonal">Lineups pending</v-chip>
       </template>
 
       <template v-else>
-        <v-chip size="small" variant="tonal" prepend-icon="mdi-calendar-clock">Scheduled</v-chip>
+        <v-chip size="small" variant="tonal">Scheduled</v-chip>
         <v-spacer />
         <v-btn v-if="tie.admin && tie.resultsAvailable !== false" size="small" variant="tonal" data-testid="card-results" @click.stop="emit('results')">
           Results
