@@ -352,6 +352,7 @@ async function onSave(): Promise<void> {
               <span class="side-head text-caption text-medium-emphasis">
                 {{ columnPlayerName(i, 1) }}
               </span>
+              <span></span>
 
               <template v-for="(g, gi) in r.games" :key="gi">
                 <span class="game-label text-body-2">Game {{ gi + 1 }}</span>
