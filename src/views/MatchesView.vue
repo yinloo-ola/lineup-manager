@@ -333,6 +333,29 @@ onMounted(async () => {
       <v-card elevation="2" rounded="lg" class="mt-4">
         <v-card-text>
           <div v-if="filtered.length" data-testid="dashboard-cards">
+            <CollapsibleMatchGroup
+              v-if="slotRows.past.length"
+              title="Past"
+              data-testid="past-panel"
+              :count="slotRows.pastCount"
+              caption="earlier timeslots"
+            >
+              <SlotSection
+                v-for="s in slotRows.past"
+                :key="s.slotIdx"
+                :label="s.label"
+                :day="s.day"
+              >
+                <MatchCard
+                  v-for="c in s.cards"
+                  :key="c.tie.tieId"
+                  :tie="c.tie"
+                  @results="openResults(c.row)"
+                  @click="selected = c.row"
+                />
+              </SlotSection>
+            </CollapsibleMatchGroup>
+
             <div data-testid="window">
               <template v-if="slotRows.windowed.length">
                 <SlotSection
@@ -362,28 +385,6 @@ onMounted(async () => {
               </v-btn>
             </div>
 
-            <CollapsibleMatchGroup
-              v-if="slotRows.past.length"
-              title="Past"
-              data-testid="past-panel"
-              :count="slotRows.pastCount"
-              caption="earlier timeslots"
-            >
-              <SlotSection
-                v-for="s in slotRows.past"
-                :key="s.slotIdx"
-                :label="s.label"
-                :day="s.day"
-              >
-                <MatchCard
-                  v-for="c in s.cards"
-                  :key="c.tie.tieId"
-                  :tie="c.tie"
-                  @results="openResults(c.row)"
-                  @click="selected = c.row"
-                />
-              </SlotSection>
-            </CollapsibleMatchGroup>
 
             <CollapsibleMatchGroup
               v-if="slotRows.future.length"

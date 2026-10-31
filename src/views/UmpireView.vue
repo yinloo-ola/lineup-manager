@@ -370,6 +370,23 @@ onMounted(load)
             />
           </div>
 
+          <CollapsibleMatchGroup
+            v-if="slotRows.past.length"
+            title="Past"
+            data-testid="past-panel"
+            :count="slotRows.pastCount"
+            caption="earlier timeslots"
+          >
+            <SlotSection
+              v-for="s in slotRows.past"
+              :key="s.slotIdx"
+              :label="s.label"
+              :day="s.day"
+            >
+              <MatchCard v-for="r in s.rows" :key="r.tieId" :tie="cardTie(r)" @enter="openEntry(r)" />
+            </SlotSection>
+          </CollapsibleMatchGroup>
+
           <div data-testid="window">
             <template v-if="slotRows.windowed.length">
               <SlotSection
@@ -398,22 +415,6 @@ onMounted(load)
             </v-btn>
           </div>
 
-          <CollapsibleMatchGroup
-            v-if="slotRows.past.length"
-            title="Past"
-            data-testid="past-panel"
-            :count="slotRows.pastCount"
-            caption="earlier timeslots"
-          >
-            <SlotSection
-              v-for="s in slotRows.past"
-              :key="s.slotIdx"
-              :label="s.label"
-              :day="s.day"
-            >
-              <MatchCard v-for="r in s.rows" :key="r.tieId" :tie="cardTie(r)" @enter="openEntry(r)" />
-            </SlotSection>
-          </CollapsibleMatchGroup>
 
           <CollapsibleMatchGroup
             v-if="slotRows.future.length"
