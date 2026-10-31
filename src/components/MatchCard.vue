@@ -30,7 +30,7 @@ const emit = defineEmits<{ enter: []; results: [] }>()
 const cardLabel = computed(() => {
   const state =
     props.tie.state === 'decided'
-      ? `decided, ${props.tie.winnerName} won ${props.tie.tally?.[0]}–${props.tie.tally?.[1]}`
+      ? `decided — ${props.tie.teamAName} ${props.tie.tally?.[0]}, ${props.tie.teamBName} ${props.tie.tally?.[1]}; ${props.tie.winnerName} won`
       : props.tie.state === 'ready'
         ? 'ready for results entry'
         : props.tie.state === 'pending'
@@ -71,13 +71,23 @@ function sideLabel(status: string): string {
       </v-btn>
     </div>
 
-    <div class="teams text-body-1 font-weight-bold">
+    <!-- A decided card's result line already names both sides — no second line. -->
+    <div
+      v-if="!(tie.state === 'decided' && tie.winnerName && tie.tally)"
+      class="teams text-body-1 font-weight-bold"
+    >
       {{ tie.teamAName }} <span class="vs text-caption text-medium-emphasis">vs</span>
       {{ tie.teamBName }}
     </div>
 
-    <div v-if="tie.state === 'decided' && tie.winnerName" class="result-line text-body-1">
-      {{ tie.winnerName }} won {{ tie.tally?.[0] }}–{{ tie.tally?.[1] }}
+    <div v-if="tie.state === 'decided' && tie.winnerName && tie.tally" class="result-line text-body-1">
+      <span :class="tie.teamAName === tie.winnerName ? 'winner' : 'loser'">
+        <v-icon v-if="tie.teamAName === tie.winnerName" size="x-small">mdi-trophy</v-icon>{{ tie.teamAName }} ({{ tie.tally[0] }})
+      </span>
+      <span class="slash text-medium-emphasis">/</span>
+      <span :class="tie.teamBName === tie.winnerName ? 'winner' : 'loser'">
+        <v-icon v-if="tie.teamBName === tie.winnerName" size="x-small">mdi-trophy</v-icon>{{ tie.teamBName }} ({{ tie.tally[1] }})
+      </span>
     </div>
 
     <div v-if="tie.admin && tie.sides" class="status-rail text-caption text-medium-emphasis">
@@ -155,9 +165,23 @@ function sideLabel(status: string): string {
   min-height: 44px;
 }
 .result-line {
-  font-weight: 700;
   white-space: nowrap;
   font-variant-numeric: tabular-nums;
+}
+.result-line > span:not(.slash) {
+  padding: 1px 6px;
+  border-radius: 6px;
+}
+.result-line .winner {
+  font-weight: 800;
+  color: rgb(var(--v-theme-success));
+}
+.result-line .loser {
+  color: rgb(var(--v-theme-on-surface-muted));
+}
+.result-line .winner .v-icon {
+  margin-right: 2px;
+  vertical-align: -2px;
 }
 .status-rail {
   display: flex;

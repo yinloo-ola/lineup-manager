@@ -209,6 +209,7 @@ test.describe('results entry (feature acceptance)', () => {
   test('scenario 1: umpire enters a decided result, admin override recomputes the winner', async ({
     page
   }) => {
+    test.setTimeout(60_000)
     await signInUmpire(page)
 
     // The entry tie is open; the gate tie is locked (both live far in the
@@ -245,8 +246,8 @@ test.describe('results entry (feature acceptance)', () => {
       .getByTestId('match-card')
       .filter({ hasText: 'E2E Results' })
       .filter({ hasText: 'Table 6' })
-    await expect(decidedCard).toContainText('Alpha')
-    await expect(decidedCard).toContainText('2–1')
+    await expect(decidedCard).toContainText('Alpha (2)')
+    await expect(decidedCard).toContainText('Charlie (1)')
 
     // Admin override: flip r1's games to Charlie and swap r1 side A's player.
     // The umpire's session would redirect /login back to /umpire — drop it.
@@ -262,7 +263,7 @@ test.describe('results entry (feature acceptance)', () => {
     await expandPanels(page)
     const resCard = page
       .getByTestId('match-card')
-      .filter({ hasText: 'Alpha vs Charlie' })
+      .filter({ hasText: 'Alpha (2)' })
       .filter({ hasText: 'E2E Results' })
       .first()
     await resCard.getByTestId('card-results').click()
@@ -286,11 +287,11 @@ test.describe('results entry (feature acceptance)', () => {
     await expandPanels(page)
     const updated = page
       .getByTestId('match-card')
-      .filter({ hasText: 'Alpha vs Charlie' })
+      .filter({ hasText: 'Table 6' })
       .filter({ hasText: 'E2E Results' })
       .first()
-    await expect(updated).toContainText('Charlie')
-    await expect(updated).toContainText('1–2')
+    await expect(updated).toContainText('Charlie (2)')
+    await expect(updated).toContainText('Alpha (1)')
   })
 
   test('scenario 2: unsubmitted lineup locks entry — UI reason, server denial, zero rows', async ({

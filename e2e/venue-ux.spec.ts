@@ -169,9 +169,10 @@ test.describe.serial('venue-ux (feature acceptance)', () => {
     // The decided 10:30 team match stays visible, dimmed, with its tally.
     const decidedCard = windowPanel
       .getByTestId('match-card')
-      .filter({ hasText: 'Alpha vs Charlie' })
+      .filter({ hasText: 'Alpha (3)' })
     await expect(decidedCard).toHaveClass(/is-decided/)
-    await expect(decidedCard.getByText('3–1')).toBeVisible()
+    await expect(decidedCard.getByText('Charlie (1)')).toBeVisible()
+    await expect(decidedCard.getByText('Alpha (3)')).toBeVisible()
 
     // The 09:00 slot and the day-two match are NOT in the window: exactly the
     // three fixture window ties (10:30/13:30/16:00) render, all category EVU.
