@@ -125,7 +125,7 @@ function cardTie(r: UmpireTieRow): MatchCardTie {
   return {
     tieId: r.tieId,
     table: r.table,
-    time: r.scheduledStart ? fmt(r.scheduledStart) : undefined,
+    time: r.scheduledStart ? fmtTime(r.scheduledStart) : undefined,
     categoryName: r.categoryName,
     teamAName: r.teamAName,
     teamBName: r.teamBName,
@@ -164,6 +164,18 @@ function fmt(iso: string | null): string {
   // Scheduled starts are tournament-local ISO stored with a UTC offset — render
   // them in UTC so card times agree with the slot headings on any device.
   return iso === null ? '—' : new Date(iso).toLocaleString(undefined, { timeZone: 'UTC' })
+}
+
+/** Compact card time: HH:mm in tournament-local (UTC) — the heading owns the day. */
+function fmtTime(iso: string | null): string {
+  return iso === null
+    ? '—'
+    : new Date(iso).toLocaleTimeString(undefined, {
+        timeZone: 'UTC',
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: false
+      })
 }
 
 async function load(): Promise<void> {

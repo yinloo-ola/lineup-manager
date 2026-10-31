@@ -2,6 +2,8 @@
 // One team match as a venue card (venue-ux R4/R6): table, time, event, both
 // teams and a state. The umpire variant offers Enter/Edit results; the admin
 // variant (admin) adds per-side lineup chips and the Results button.
+import { computed } from 'vue'
+
 export interface MatchCardTie {
   tieId: string
   table?: string
@@ -24,6 +26,20 @@ export interface MatchCardTie {
 const props = defineProps<{ tie: MatchCardTie }>()
 const emit = defineEmits<{ enter: []; results: [] }>()
 
+/** One-breath summary for assistive tech. */
+const cardLabel = computed(() => {
+  const state =
+    props.tie.state === 'decided'
+      ? `decided, ${props.tie.winnerName} won ${props.tie.tally?.[0]}–${props.tie.tally?.[1]}`
+      : props.tie.state === 'ready'
+        ? 'ready for results entry'
+        : props.tie.state === 'pending'
+          ? 'waiting for lineups'
+          : 'scheduled'
+  const table = props.tie.table ? `table ${props.tie.table}, ` : ''
+  return `${props.tie.teamAName} versus ${props.tie.teamBName}, ${table}${state}`
+})
+
 function sideLabel(status: string): string {
   if (status === 'submitted') return 'in'
   if (status === 'missed-cutoff') return 'missed cutoff'
@@ -32,11 +48,10 @@ function sideLabel(status: string): string {
 </script>
 
 <template>
-  <v-card
+  <div
     data-testid="match-card"
     :class="['match-card', { 'is-decided': tie.state === 'decided' }]"
-    rounded="lg"
-    variant="outlined"
+    :aria-label="cardLabel"
   >
     <div class="d-flex align-center ga-2 text-body-2 text-medium-emphasis">
       <span v-if="tie.table" class="table-chip">Table {{ tie.table }}</span>
@@ -61,6 +76,10 @@ function sideLabel(status: string): string {
       {{ tie.teamBName }}
     </div>
 
+    <div v-if="tie.state === 'decided' && tie.winnerName" class="result-line text-body-1">
+      {{ tie.winnerName }} won {{ tie.tally?.[0] }}–{{ tie.tally?.[1] }}
+    </div>
+
     <div v-if="tie.admin && tie.sides" class="d-flex flex-wrap ga-3 text-caption text-medium-emphasis">
       <span v-for="(s, i) in tie.sides" :key="i" class="d-inline-flex align-center ga-1">
         <v-icon size="x-small" :color="s.status === 'submitted' ? 'success' : s.status === 'missed-cutoff' ? 'error' : 'grey'">
@@ -71,13 +90,9 @@ function sideLabel(status: string): string {
       </span>
     </div>
 
-    <div class="d-flex align-center ga-2 mt-1" style="min-height: 40px">
+    <div class="d-flex align-center ga-2 mt-1 card-foot">
       <template v-if="tie.state === 'decided'">
         <v-chip size="small" color="success" variant="tonal" prepend-icon="mdi-check">Decided</v-chip>
-        <span class="font-weight-bold">{{ tie.winnerName }}</span>
-        <span v-if="tie.tally" class="text-body-2 text-medium-emphasis tally">
-          {{ tie.tally[0] }}–{{ tie.tally[1] }}
-        </span>
         <v-spacer />
         <v-btn
           v-if="!tie.admin"
@@ -126,7 +141,7 @@ function sideLabel(status: string): string {
         </v-btn>
       </template>
     </div>
-  </v-card>
+  </div>
 </template>
 
 <style scoped>
@@ -136,6 +151,17 @@ function sideLabel(status: string): string {
   flex-direction: column;
   gap: 7px;
   height: 100%;
+  background: rgb(var(--v-theme-surface));
+  border: 1px solid rgba(var(--v-border-color), var(--v-border-opacity));
+  border-radius: 13px;
+}
+.card-foot {
+  min-height: 44px;
+}
+.result-line {
+  font-weight: 700;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
 }
 .match-card.is-decided {
   opacity: 0.72;

@@ -149,7 +149,7 @@ function adminCard(m: MatchRow): MatchCardTie {
   return {
     tieId: m.tieId,
     table: m.table,
-    time: fmt(m.scheduledStart),
+    time: fmtTime(m.scheduledStart),
     categoryName: m.categoryName,
     categoryId: m.categoryId,
     teamAName: m.sides[0].teamName,
@@ -230,6 +230,18 @@ function fmt(iso: string | null): string {
   // Scheduled starts are tournament-local ISO stored with a UTC offset — render
   // them in UTC so card times agree with the slot headings on any device.
   return iso === null ? '—' : new Date(iso).toLocaleString(undefined, { timeZone: 'UTC' })
+}
+
+/** Compact card time: HH:mm in tournament-local (UTC) — the heading owns the day. */
+function fmtTime(iso: string | null): string {
+  return iso === null
+    ? '—'
+    : new Date(iso).toLocaleTimeString(undefined, {
+        timeZone: 'UTC',
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: false
+      })
 }
 
 /** group · round metadata parts, shown where the seed provides them. */
