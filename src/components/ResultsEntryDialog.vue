@@ -58,6 +58,8 @@ const emit = defineEmits<{
 }>()
 
 const rubbers = reactive<EditRubber[]>([])
+/** Keyed games parked when a match flips to walkover — restored on flip-back. */
+const gamesStash = new Map<number, EntryGame[]>()
 const bestOfDraft = ref('')
 const violationsByRubber = reactive<Record<number, string[]>>({})
 const bestOfError = ref<string | null>(null)
@@ -121,6 +123,25 @@ watch(
 
 function addGame(rubber: number): void {
   rubbers[rubber].games.push({ a: '', b: '' })
+}
+
+/** Flipping to walkover parks the keyed games (a walkover has no scores);
+ *  flipping back restores them — nothing is lost until save. */
+function toggleWalkover(rubber: number, on: boolean): void {
+  const r = rubbers[rubber]
+  if (on) {
+    gamesStash.set(rubber, r.games)
+    r.games = [{ a: '', b: '' }]
+  } else {
+    r.games = gamesStash.get(rubber) ?? [{ a: '', b: '' }]
+    gamesStash.delete(rubber)
+  }
+}
+
+function removeGame(rubber: number, game: number): void {
+  const r = rubbers[rubber]
+  r.games.splice(game, 1)
+  if (r.games.length === 0) r.games.push({ a: '', b: '' })
 }
 
 /** Side display names for one rubber: umpire = pre-filled lineup names. */
@@ -315,6 +336,7 @@ async function onSave(): Promise<void> {
               hide-details
               :aria-label="`Match ${i + 1} walkover`"
               data-testid="walkover-toggle"
+              @update:model-value="toggleWalkover(i, $event as boolean)"
             >
               <template #label><span class="text-body-2">Walkover</span></template>
             </v-checkbox>
@@ -349,6 +371,13 @@ async function onSave(): Promise<void> {
                   density="compact"
                   hide-details
                   class="score-field"
+                />
+                <v-btn
+                  icon="mdi-close"
+                  size="x-small"
+                  variant="text"
+                  :aria-label="`Match ${i + 1} remove game ${gi + 1}`"
+                  @click="removeGame(i, gi)"
                 />
               </template>
             </div>
@@ -417,7 +446,7 @@ async function onSave(): Promise<void> {
 }
 .score-grid {
   display: grid;
-  grid-template-columns: 70px minmax(72px, 110px) 16px minmax(72px, 110px);
+  grid-template-columns: 70px minmax(72px, 110px) 16px minmax(72px, 110px) 32px;
   column-gap: 8px;
   row-gap: 6px;
   align-items: center;
