@@ -19,7 +19,7 @@ import {
   type ScheduleSlot
 } from '@/domain/scheduleWindow'
 import type { GameScore, Side } from '@/domain/results'
-import UmpireEntryDialog from '@/components/UmpireEntryDialog.vue'
+import ResultsEntryDialog from '@/components/ResultsEntryDialog.vue'
 import ThemeToggle from '@/components/ThemeToggle.vue'
 import { usePolling } from '@/composables/polling'
 import MatchCard, { type MatchCardTie } from '@/components/MatchCard.vue'
@@ -436,8 +436,9 @@ onMounted(load)
       </v-card-text>
     </v-card>
 
-    <UmpireEntryDialog
+    <ResultsEntryDialog
       v-model="entryOpen"
+      variant="umpire"
       :tie-id="entryTie?.tieId ?? ''"
       :event-name="entryTie?.categoryName ?? ''"
       :team-a-name="entryTie?.teamAName ?? ''"

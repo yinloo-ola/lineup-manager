@@ -237,7 +237,7 @@ test.describe('results entry (feature acceptance)', () => {
       await fillGame(page, 3, game + 1, a, b)
     }
     await page.getByRole('checkbox', { name: 'Match 2 walkover' }).check()
-    await page.getByRole('radio', { name: 'Match 2 walkover side A' }).check()
+    await page.getByRole('button', { name: 'Match 2 walkover side A' }).click()
 
     await page.getByRole('button', { name: /save results/i }).click()
     // The card flips to decided with the derived winner and tally.

@@ -31,7 +31,7 @@ import MatchStatusChips from '@/components/MatchStatusChips.vue'
 import SlotSection from '@/components/SlotSection.vue'
 import CollapsibleMatchGroup from '@/components/CollapsibleMatchGroup.vue'
 import { usePolling } from '@/composables/polling'
-import AdminResultsDialog from '@/components/AdminResultsDialog.vue'
+import ResultsEntryDialog from '@/components/ResultsEntryDialog.vue'
 
 const tournaments = useTournamentStore()
 const matches = ref<MatchRow[]>([])
@@ -519,11 +519,15 @@ onMounted(async () => {
       </v-card>
     </v-dialog>
 
-    <AdminResultsDialog
+    <ResultsEntryDialog
       v-model="resultsOpen"
+      variant="admin"
       :tie-id="resultsTie?.tieId ?? ''"
+      :event-name="resultsTie?.categoryName"
       :team-a-name="resultsTie?.sides[0].teamName ?? ''"
       :team-b-name="resultsTie?.sides[1].teamName ?? ''"
+      :best-of="resultsTie ? resultContexts.get(resultsTie.tieId)?.bestOf ?? 5 : 5"
+      :rubber-count="resultsTie ? resultContexts.get(resultsTie.tieId)?.rubberCount ?? 0 : 0"
       :context="resultsTie ? resultContexts.get(resultsTie.tieId) ?? null : null"
       :roster-a="resultsTie?.sides[0].teamId ? rosterByTeam.get(resultsTie.sides[0].teamId) ?? [] : []"
       :roster-b="resultsTie?.sides[1].teamId ? rosterByTeam.get(resultsTie.sides[1].teamId) ?? [] : []"
