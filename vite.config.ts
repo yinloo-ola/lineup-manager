@@ -4,7 +4,10 @@ import vue from '@vitejs/plugin-vue'
 import vuetify from 'vite-plugin-vuetify'
 
 // https://vite.dev/config/
+// GitHub Pages serves project sites under a subpath — production builds root
+// the app at /lineup-manager/; dev and e2e stay at '/'.
 export default defineConfig({
+  base: process.env.NODE_ENV === 'production' ? '/lineup-manager/' : '/',
   plugins: [
     vue(),
     // Vuetify auto-imports components and compiles its SCSS (needs `sass` installed).
