@@ -53,7 +53,7 @@ function sideLabel(status: string): string {
     :class="['match-card', { 'is-decided': tie.state === 'decided' }]"
     :aria-label="cardLabel"
   >
-    <div class="d-flex align-center ga-2 text-body-2 text-medium-emphasis">
+    <div class="d-flex align-baseline ga-2 text-body-2 text-medium-emphasis">
       <span v-if="tie.table" class="table-chip">Table {{ tie.table }}</span>
       <span v-if="tie.time" class="font-weight-medium">{{ tie.time }}</span>
       <span v-if="tie.categoryName">{{ tie.categoryName }}</span>
@@ -80,7 +80,7 @@ function sideLabel(status: string): string {
       {{ tie.winnerName }} won {{ tie.tally?.[0] }}–{{ tie.tally?.[1] }}
     </div>
 
-    <div v-if="tie.admin && tie.sides" class="d-flex flex-wrap ga-3 text-caption text-medium-emphasis">
+    <div v-if="tie.admin && tie.sides" class="status-rail text-caption text-medium-emphasis">
       <span v-for="(s, i) in tie.sides" :key="i" class="d-inline-flex align-center ga-1">
         <v-icon size="x-small" :color="s.status === 'submitted' ? 'success' : s.status === 'missed-cutoff' ? 'error' : 'grey'">
           {{ s.status === 'submitted' ? 'mdi-check-circle' : s.status === 'missed-cutoff' ? 'mdi-alert-circle' : 'mdi-circle-outline' }}
@@ -161,6 +161,15 @@ function sideLabel(status: string): string {
   white-space: nowrap;
   font-variant-numeric: tabular-nums;
 }
+.status-rail {
+  display: flex;
+  flex-wrap: wrap;
+  column-gap: 14px;
+  row-gap: 2px;
+}
+.status-rail > span {
+  min-width: 0;
+}
 .match-card.is-decided {
   opacity: 0.72;
 }
@@ -171,8 +180,9 @@ function sideLabel(status: string): string {
 .table-chip {
   font-weight: 700;
   font-size: 11px;
-  padding: 2px 7px;
-  border-radius: 7px;
+  line-height: 14px;
+  padding: 1px 6px;
+  border-radius: 6px;
   background: rgb(var(--v-theme-surface-raised));
 }
 .teams .vs {
