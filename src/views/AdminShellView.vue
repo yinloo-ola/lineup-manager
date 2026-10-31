@@ -40,7 +40,7 @@ async function onSignOut(): Promise<void> {
       <div class="px-4 pt-2 text-overline text-medium-emphasis">Tournament</div>
       <v-list-item
         :active="$route.name === 'matches'"
-        :active-color="$route.name === 'matches' ? 'primary' : undefined"
+        :color="$route.name === 'matches' ? 'primary' : undefined"
         prepend-icon="mdi-table-tennis"
         title="Matches"
         :disabled="!hasTournament"
