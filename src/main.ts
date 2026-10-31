@@ -8,7 +8,7 @@ import './assets/main.css'
 
 // Adopt the persisted theme before mount so first paint matches the choice.
 const themePreference = loadThemePreference()
-vuetify.theme.global.name.value = themePreference
+vuetify.theme.change(themePreference)
 document.documentElement.dataset.theme = themeMarker(themePreference)
 
 const app = createApp(App)

@@ -18,7 +18,7 @@ const current = computed<ThemeName>(() =>
 )
 
 function apply(next: ThemeName): void {
-  theme.global.name.value = next
+  theme.change(next)
   document.documentElement.dataset.theme = themeMarker(next)
   saveThemePreference(next)
 }
