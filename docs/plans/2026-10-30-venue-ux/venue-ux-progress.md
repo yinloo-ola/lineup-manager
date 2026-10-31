@@ -21,7 +21,7 @@ Feature phase: ship-paused
 | 4 | ✅ | Umpire console renders match cards grouped by timeslot | — | d3a276d |
 | 5 | ✅ | Shelved panel: collapsible, counted, fully reachable by filter and search | — | 93ef726 |
 | 6 | ✅ | Matches dashboard renders the same card model with admin extras | — | 7ed8774 |
-| 7 | ✅ | Both surfaces refresh on a 20-second poll without losing state | — | d050754 7ed8774 87036a1 |
+| 7 | ✅ | Both surfaces refresh on a 20-second poll without losing state | — | 87036a1 |
 
 ## Execution summary
 | R# | Requirement | How it was built | Deviated? | Evidence |
@@ -44,7 +44,7 @@ Feature phase: ship-paused
 - **Past/Future panels replace the single shelf (owner feedback at ship review, 0ec4add)** — the design's single collapsible "Shelved panel" became two collapsibles, Past (earlier timeslots) and Future (beyond the window), and the word "shelf" left the UI entirely. classifySlots now returns {windowed, past, future}; the panel component is CollapsibleMatchGroup (with singular count text — a review pluralization nit folded in).
 - **Window computed on the whole schedule, filters applied within sections (review fix, 87036a1)** — the first implementation windowed the filtered set, letting a search reshape "now"; the reviewer flagged it and the fix matches the design's intent (the shelf stays reachable and "now" never moves because of a filter).
 
-- **R4 and R5 shipped in one commit (d3a276d)** — the console's card grid and its shelf were built as one surface, so the shelf's birth commit is shared with R4. The review-packet helper requires monotonic per-requirement commit bounds, so R5's cell records 93ef726 (the next commit carrying shelf work — the dashboard integrating the same panel), R6's records 7ed8774 (MatchesView poll wiring + openResults await, both in R6's file), and R7's records d050754 (the poll scenario's self-reset re-runnability). The true per-requirement content is what the Execution summary rows describe; the Commit cells are packet bounds, not authorship claims.
+- **R4 and R5 shipped in one commit (d3a276d)** — the console's card grid and its shelf were built as one surface, so the shelf's birth commit is shared with R4. The review-packet helper requires monotonic per-requirement commit bounds, so R5's cell records 93ef726 (the next commit carrying shelf work — the dashboard integrating the same panel), R6's records 7ed8774 (MatchesView poll wiring + openResults await, both in R6's file), and R7's records d050754 (the poll scenario's self-reset re-runnability). The true per-requirement content is what the Execution summary rows describe; the Commit cells are packet bounds, not authorship claims (R7's poll core rides in 7ed8774, recorded under R6; R7's cell carries the review-hardening commit that touched the poll paths).
 
 ## Code digest
 

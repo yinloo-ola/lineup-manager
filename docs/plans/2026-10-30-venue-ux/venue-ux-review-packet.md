@@ -2,10 +2,12 @@
 
 Base: 48c7b0087cd32d201fd58667076344ac786aa084
 
-Head: 87036a168d830277abedd8ad49ecfc820223f974
+Head: c8ca2544134c942603774cef7f16217fb1f98919
 
 ## Commits
 
+c8ca254 docs(venue-ux): ship-review amendment records + refreshed review packet
+0ec4add feat(ux): split the shelf into Past and Future collapsible panels — owner rename, no 'shelf' vocabulary; real-clock E2E fixtures (month-end safe)
 87036a1 fix(ux): inline review fixes — results eligibility back on admin cards, window shapes the whole schedule, symmetric alert lifecycles, consecutive-gap clustering, in-slot time-then-table sort, UTC-consistent times, guarded storage read, 44px touch targets
 d050754 test(ux): re-runnable venue-ux scenario 2 (self-resetting submission), openResults awaits contexts, manager spec tolerates added fixture ties
 7ed8774 feat(ux): live venue polling — 20s interval, visibility-paused, return-refresh, keep-last-good on mid-session failures (R7)
@@ -17,35 +19,36 @@ d3a276d feat(ux): umpire console card grid — timeslot window, decided-in-place
 
 ## Changed files
 
- e2e/admin.spec.ts                            |   3 +-
- e2e/format-guard.spec.ts                     |   3 +-
- e2e/helpers.ts                               |  15 ++
- e2e/manage.spec.ts                           |   3 +-
- e2e/manager.spec.ts                          |   5 +-
- e2e/results.spec.ts                          |  67 ++++---
- e2e/tournament.spec.ts                       |   3 +-
- e2e/venue-ux.spec.ts                         | 270 +++++++++++++++++++++++++++
- src/components/MatchCard.vue                 | 160 ++++++++++++++++
- src/components/ShelvedPanel.vue              |  54 ++++++
- src/components/SlotSection.vue               |  44 +++++
- src/components/ThemeToggle.vue               |  44 +++++
- src/composables/__tests__/polling.test.ts    |  63 +++++++
- src/composables/polling.ts                   |  55 ++++++
- src/domain/__tests__/results.test.ts         |  34 +++-
- src/domain/__tests__/scheduleWindow.test.ts  | 128 +++++++++++++
- src/domain/matchesDashboard.ts               |   9 +-
- src/domain/results.ts                        |  25 ++-
- src/domain/scheduleWindow.ts                 | 134 +++++++++++++
- src/domain/umpireView.ts                     |   7 +-
- src/main.ts                                  |   6 +
- src/plugins/vuetify.ts                       |  12 +-
- src/themes/__tests__/themePreference.test.ts |  40 ++++
- src/themes/themePreference.ts                |  42 +++++
- src/themes/tokens.ts                         |  77 ++++++++
- src/views/AdminShellView.vue                 |   2 +
- src/views/MatchesView.vue                    | 232 ++++++++++++++++-------
- src/views/UmpireView.vue                     | 230 ++++++++++++++++-------
- 28 files changed, 1582 insertions(+), 185 deletions(-)
+ .../plans/2026-10-30-venue-ux/venue-ux-progress.md |  59 +++--
+ e2e/admin.spec.ts                                  |   3 +-
+ e2e/format-guard.spec.ts                           |   3 +-
+ e2e/helpers.ts                                     |  17 ++
+ e2e/manage.spec.ts                                 |   3 +-
+ e2e/manager.spec.ts                                |   5 +-
+ e2e/results.spec.ts                                |  67 +++--
+ e2e/tournament.spec.ts                             |   3 +-
+ e2e/venue-ux.spec.ts                               | 287 +++++++++++++++++++++
+ src/components/CollapsibleMatchGroup.vue           |  65 +++++
+ src/components/MatchCard.vue                       | 160 ++++++++++++
+ src/components/SlotSection.vue                     |  44 ++++
+ src/components/ThemeToggle.vue                     |  44 ++++
+ src/composables/__tests__/polling.test.ts          |  63 +++++
+ src/composables/polling.ts                         |  55 ++++
+ src/domain/__tests__/results.test.ts               |  34 ++-
+ src/domain/__tests__/scheduleWindow.test.ts        | 139 ++++++++++
+ src/domain/matchesDashboard.ts                     |   9 +-
+ src/domain/results.ts                              |  25 +-
+ src/domain/scheduleWindow.ts                       | 137 ++++++++++
+ src/domain/umpireView.ts                           |   7 +-
+ src/main.ts                                        |   6 +
+ src/plugins/vuetify.ts                             |  12 +-
+ src/themes/__tests__/themePreference.test.ts       |  40 +++
+ src/themes/themePreference.ts                      |  42 +++
+ src/themes/tokens.ts                               |  77 ++++++
+ src/views/AdminShellView.vue                       |   2 +
+ src/views/MatchesView.vue                          | 263 ++++++++++++++-----
+ src/views/UmpireView.vue                           | 254 ++++++++++++------
+ 29 files changed, 1723 insertions(+), 202 deletions(-)
 
 ## Acceptance criteria (verbatim from the design doc)
 
@@ -181,14 +184,103 @@ Red-first at the domain seam: slot clustering (referee jitter, mixed grids, offs
 
 ## Diff
 
+diff --git a/docs/plans/2026-10-30-venue-ux/venue-ux-progress.md b/docs/plans/2026-10-30-venue-ux/venue-ux-progress.md
+index 5c207a0..8c0ab02 100644
+--- a/docs/plans/2026-10-30-venue-ux/venue-ux-progress.md
++++ b/docs/plans/2026-10-30-venue-ux/venue-ux-progress.md
+@@ -8,41 +8,68 @@ Setup: n/a
+ 
+ Started: 2026-10-30T14:20:00Z
+ 
+-Last updated: 2026-10-30T14:20:00Z
++Last updated: 2026-10-30T17:24:28.316Z
+ 
+-Feature phase: e2e-written
++Feature phase: ship-paused
+ 
+ ## Requirements
+ | # | Done | Requirement | Per-req ceremony | Commit |
+ |---|------|-------------|-----------------|--------|
+-| 1 | ⬜ | Dual theme (light/dark) with an app-wide toggle that persists | — | — |
+-| 2 | ⬜ | Timeslots derived from scheduled starts by gap clustering | — | — |
+-| 3 | ⬜ | Working window = current timeslot + next two, with a show-all escape | — | — |
+-| 4 | ⬜ | Umpire console renders match cards grouped by timeslot | — | — |
+-| 5 | ⬜ | Shelved panel: collapsible, counted, fully reachable by filter and search | — | — |
+-| 6 | ⬜ | Matches dashboard renders the same card model with admin extras | — | — |
+-| 7 | ⬜ | Both surfaces refresh on a 20-second poll without losing state | — | — |
++| 1 | ✅ | Dual theme (light/dark) with an app-wide toggle that persists | — | 26a9b1d |
++| 2 | ✅ | Timeslots derived from scheduled starts by gap clustering | — | 87b02cd |
++| 3 | ✅ | Working window = current timeslot + next two, with a show-all escape | — | 1a5525d |
++| 4 | ✅ | Umpire console renders match cards grouped by timeslot | — | d3a276d |
++| 5 | ✅ | Shelved panel: collapsible, counted, fully reachable by filter and search | — | 93ef726 |
++| 6 | ✅ | Matches dashboard renders the same card model with admin extras | — | 7ed8774 |
++| 7 | ✅ | Both surfaces refresh on a 20-second poll without losing state | — | d050754 7ed8774 87036a1 |
+ 
+ ## Execution summary
+ | R# | Requirement | How it was built | Deviated? | Evidence |
+ |----|-------------|------------------|-----------|----------|
+-| 1 | Dual theme (light/dark) with an app-wide toggle that persists | | | |
+-| 2 | Timeslots derived from scheduled starts by gap clustering | | | |
+-| 3 | Working window = current timeslot + next two, with a show-all escape | | | |
+-| 4 | Umpire console renders match cards grouped by timeslot | | | |
+-| 5 | Shelved panel: collapsible, counted, fully reachable by filter and search | | | |
+-| 6 | Matches dashboard renders the same card model with admin extras | | | |
+-| 7 | Both surfaces refresh on a 20-second poll without losing state | | | |
++| 1 | Dual theme (light/dark) with an app-wide toggle that persists | One token file drives two named Vuetify themes (ttLight/ttDark); ThemeToggle lives in the admin shell app bar and umpire console header; the choice persists in localStorage and main.ts applies it before first paint; html[data-theme] mirrors the theme for CSS tokens. | themePreference's injectable-storage params initially made default calls no-ops — caught by the persistence E2E (reload reverted to light); defaults now resolve to real localStorage | E2E scenario 3 green: toggle → html[data-theme=dark], reload keeps dark; 6 unit tests on the preference logic; unit suite 278/278; commit 26a9b1d |
++| 2 | Timeslots derived from scheduled starts by gap clustering | Pure deriveSlots in src/domain/scheduleWindow.ts: distinct scheduled starts sorted, clustered with a 30-minute gap threshold; null-start (knockout) ties excluded; slots carry label/start/tieIds. | — | 6 domain tests green (referee shift clusters, 1h+2.5h grids separate, offset parallel clusters, other-day separation, unsorted/null input, exact-30 vs 31-minute boundary); unit 284/284; commit 87b02cd |
++| 3 | Working window = current timeslot + next two, with a show-all escape | computeWindow (current slot by now, lookahead 2, never crossing a UTC day boundary — day-two matches always shelve on day one) and classifySlots (windowed/shelved index split); the show-all escape is the view skipping classification. | red-green found three edge bugs before commit: before-first-slot chose the last slot, empty-window classification showed all, and the window jumped into day two | 16 domain tests green incl. all five acceptance edges (11:20 window, before-first, after-last, other-day, boundary 10:29/10:30); unit 290/290; commit 1a5525d |
++| 4 | Umpire console renders match cards grouped by timeslot | MatchCard/SlotSection components + UmpireView rebuilt: cards grouped by derived timeslot (Now-tagged current), ready/decided/pending states, decided cards dimmed with tally 3–1 and an Edit affordance; deriveTieResult now carries the tally; time-then-table order per slot. | tally added to deriveTieResult (design said 'e.g. 3–1' display; the derivation had no tally) | E2E scenario 1 green: window shows 10:30/13:30/16:00 sections, decided card has is-decided + 3–1, one-column stacking untested visually but grid is CSS-auto; unit 295/295; commit d3a276d |
++| 5 | Shelved panel: collapsible, counted, fully reachable by filter and search | ShelvedPanel disclosure (aria-expanded, count chip) below the window; expanding reveals shelved slot sections; event filter and search apply across window and shelf because both render the same filtered rows. | — | E2E scenario 1: collapsed shelf shows count and zero cards, expand reveals the two shelved EVU ties, search Kilo leaves only the day-two card anywhere; commit d3a276d |
++| 6 | Matches dashboard renders the same card model with admin extras | MatchesView rebuilt on MatchCard/SlotSection/ShelvedPanel: same window/shelf model as the console; admin cards carry per-side lineup chips (in / no lineup / missed cutoff / Needs attention), Results button opening the existing dialog, bracket link on knockout cards; event selector + status filters apply across window and shelf; the row detail dialog (best-of editor, edit-on-behalf) stays reachable by clicking a card. Existing specs updated to the card model with an expandShelf helper. | template bound :tie=c.card while the cards carried {tie,row} — undefined-prop crash caught by the existing admin/format-guard specs during regression; also plumb tally into MatchRow via deriveResultState | results/admin/manage/tournament/format-guard specs 10/10 green after the rebuild; unit 295/295; commit 93ef726 |
++| 7 | Both surfaces refresh on a 20-second poll without losing state | startPolling composable with injected deps (unit-tested: interval ticks, hidden-tab pause, immediate return-refresh, stop) + usePolling lifecycle wrapper; wired into UmpireView and MatchesView; first-load failures surface the error alert, mid-session poll failures log and keep the last good data. | — | E2E scenario 2 green: submitting the second lineup then clock.fastForward(20s) flips the pending card to Enter results with no reload; 3 polling unit tests |
+ 
+ ## Deviation records
+ 
+ <!-- One short paragraph per design-decision reversal -->
+ 
++- **Past/Future panels replace the single shelf (owner feedback at ship review)** — the design's single collapsible "Shelved panel" became two collapsibles, Past (earlier timeslots) and Future (beyond the window), and the word "shelf" left the UI entirely. classifySlots now returns {windowed, past, future}; the panel component is CollapsibleMatchGroup (singular count text folded in). The E2E fixtures moved to real-clock relative times after the fake 11:20 clock expired the auth session's JWT at UTC midnight (and a month-end date bug surfaced the same class of risk).
++
++- **R4 and R5 shipped in one commit (d3a276d)** — the console's card grid and its shelf were built as one surface, so the shelf's birth commit is shared with R4. The review-packet helper requires monotonic per-requirement commit bounds, so the Commit cells carry the next commit that touched each requirement's surface; the true per-requirement content is what the Execution summary rows describe. Commit cells are packet bounds, not authorship claims.
++- **Past/Future panels replace the single shelf (owner feedback at ship review, 0ec4add)** — the design's single collapsible "Shelved panel" became two collapsibles, Past (earlier timeslots) and Future (beyond the window), and the word "shelf" left the UI entirely. classifySlots now returns {windowed, past, future}; the panel component is CollapsibleMatchGroup (with singular count text — a review pluralization nit folded in).
++- **Window computed on the whole schedule, filters applied within sections (review fix, 87036a1)** — the first implementation windowed the filtered set, letting a search reshape "now"; the reviewer flagged it and the fix matches the design's intent (the shelf stays reachable and "now" never moves because of a filter).
++
++- **R4 and R5 shipped in one commit (d3a276d)** — the console's card grid and its shelf were built as one surface, so the shelf's birth commit is shared with R4. The review-packet helper requires monotonic per-requirement commit bounds, so R5's cell records 93ef726 (the next commit carrying shelf work — the dashboard integrating the same panel), R6's records 7ed8774 (MatchesView poll wiring + openResults await, both in R6's file), and R7's records d050754 (the poll scenario's self-reset re-runnability). The true per-requirement content is what the Execution summary rows describe; the Commit cells are packet bounds, not authorship claims.
++
+ ## Code digest
+ 
+ <!-- Written once, after the feature review passes; never back-filled per requirement. -->
+ 
+ ### Summary
++The venue screens were rebuilt around a timeslot working window: the umpire console and the Matches dashboard render match cards for the current timeslot plus the next two, everything else collapsing into a counted Shelved panel that search and filters still reach. The whole app gained a token-driven light/dark theme with a persistent toggle, and both surfaces refresh every 20 seconds while visible. Winners are still pure derivations — nothing new is stored.
++
+ ### Flow
++- **Spine** — `load (unchanged loaders) -> deriveSlots (gap-clustered starts, 30-min) -> computeWindow (now + 2, day-safe) -> classifySlots -> SlotSection cards [R4] -> ShelvedPanel (count, expand) [R5]`
++- **Spine** — `ThemeToggle -> named Vuetify theme (ttLight/ttDark from tokens) -> html[data-theme] + localStorage -> adopted before first paint [R1]`
++- **Spine** — `usePolling -> 20s tick (visible-only) -> existing load fns -> recompute window [R7]`
++- **Branches** — `show-all escape -> classification skipped, every slot renders` [R3]
++- **Branches** — `search/event filter -> narrows within window AND shelf, never moves Now` [R5]
++- **Branches** — `admin card -> lineup chips + Results (only where resultsEligible) + bracket link on knockouts` [R6]
++- **Branches** — `tab hidden -> poll skipped; return -> immediate refresh; mid-session poll failure -> keep last good data` [R7]
++- **Side effects** — reads: the existing per-surface queries · writes: none (localStorage for the theme choice only)
+ ### Gotchas
++- Admin Results buttons are eligibility-gated again — knockout/TBD rows hide them (the review caught a dead-dialog regression).
++- Card and heading times render in UTC (tournament-local convention); device-local rendering would disagree on non-UTC devices.
++- Scenario 2's E2E self-resets its prior lineup submission — without it a re-run finds the card already ready.
+ ### Key files
++- `src/domain/scheduleWindow.ts` — the pure window: gap clustering, lookahead, day-safe classification, in-slot sort.
++- `src/views/UmpireView.vue` — the umpire console: cards, window, Past/Future groups, poll.
++- `src/views/MatchesView.vue` — the dashboard variant: admin chips, eligibility-gated Results, filters.
++- `src/components/MatchCard.vue` — the shared card (states, tally, admin extras, 44px targets).
++- `src/components/CollapsibleMatchGroup.vue` — the Past/Future disclosure group (count, aria-expanded).
++- `src/themes/tokens.ts` — the single palette source for both named themes.
 diff --git a/e2e/admin.spec.ts b/e2e/admin.spec.ts
-index 97a6b42..2e2a8b4 100644
+index 97a6b42..378cd8b 100644
 --- a/e2e/admin.spec.ts
 +++ b/e2e/admin.spec.ts
 @@ -1,5 +1,5 @@
  import { test, expect } from '@playwright/test'
 -import { apiToken, deleteLineup } from './helpers'
-+import { apiToken, deleteLineup, expandShelf } from './helpers'
++import { apiToken, deleteLineup, expandPanels } from './helpers'
  import { TEST_ADMIN_EMAIL, TEST_ADMIN_PASSWORD } from './global-setup'
  
  // Ticket 8: the administrator oversight surface. The admin sees every team's
@@ -196,18 +288,18 @@ index 97a6b42..2e2a8b4 100644
      // The fixture table lists one row per team match (the pre-created Alpha
      // lineup guarantees a Submitted chip in Alpha's row).
      await page.goto('/admin/lineups')
-+    await expandShelf(page)
++    await expandPanels(page)
      await expect(page.getByText('Alpha').first()).toBeVisible()
      await expect(page.getByText('Submitted').first()).toBeVisible()
  
 diff --git a/e2e/format-guard.spec.ts b/e2e/format-guard.spec.ts
-index d5bee53..18b46dc 100644
+index d5bee53..3184603 100644
 --- a/e2e/format-guard.spec.ts
 +++ b/e2e/format-guard.spec.ts
 @@ -1,5 +1,5 @@
  import { test, expect, type Page } from '@playwright/test'
 -import { apiToken, authHeaders, signInAdmin, supabaseUrl } from './helpers'
-+import { apiToken, authHeaders, expandShelf, signInAdmin, supabaseUrl } from './helpers'
++import { apiToken, authHeaders, expandPanels, signInAdmin, supabaseUrl } from './helpers'
  import { TEST_ADMIN_EMAIL, TEST_ADMIN_PASSWORD } from './global-setup'
  
  // Ticket #16: the guarded pre-start format edit + the freeze (spec §6). Uses
@@ -215,30 +307,32 @@ index d5bee53..18b46dc 100644
      await expect(page.getByText(/Saved 1 match/)).toBeVisible()
  
      await page.goto('/matches')
-+    await expandShelf(page)
++    await expandPanels(page)
      await expect(page.getByText('Needs attention').first()).toBeVisible()
    })
  
 diff --git a/e2e/helpers.ts b/e2e/helpers.ts
-index cf8a63e..a6247be 100644
+index cf8a63e..e0b586b 100644
 --- a/e2e/helpers.ts
 +++ b/e2e/helpers.ts
-@@ -68,6 +68,21 @@ export async function signInManager(page: Page, email: string, password: string)
+@@ -68,6 +68,23 @@ export async function signInManager(page: Page, email: string, password: string)
    await expect(page).toHaveURL(/\/manager$/)
  }
  
 +/**
-+ * The venue dashboard shelves matches outside the working window (current
-+ * timeslot + next two). Fixture ties live far in the future/past, so specs
-+ * that assert on dashboard cards expand the shelf first.
++ * The venue views group matches outside the working window (current timeslot
++ * + next two) into collapsible Past and Future panels. Fixture ties live far
++ * in the future/past, so specs that assert on cards expand both panels first.
 + */
-+export async function expandShelf(page: Page): Promise<void> {
-+  const head = page.getByTestId('shelf').getByRole('button', { name: /shelved/i })
-+  // The dashboard loads asynchronously — give the shelf a moment to render,
-+  // but never hang on surfaces that legitimately have none.
-+  await head.waitFor({ state: 'visible', timeout: 5000 }).catch(() => {})
-+  if ((await head.count()) > 0 && (await head.getAttribute('aria-expanded')) === 'false') {
-+    await head.click()
++export async function expandPanels(page: Page): Promise<void> {
++  for (const testId of ['past-panel', 'future-panel']) {
++    const head = page.getByTestId(testId).locator('button.group-head')
++    // The views load asynchronously — give the panels a moment to render,
++    // but never hang on surfaces that legitimately have none.
++    await head.waitFor({ state: 'visible', timeout: 5000 }).catch(() => {})
++    if ((await head.count()) > 0 && (await head.getAttribute('aria-expanded')) === 'false') {
++      await head.click()
++    }
 +  }
 +}
 +
@@ -246,13 +340,13 @@ index cf8a63e..a6247be 100644
   * Sign in as the administrator and land on the setup-aware landing surface:
   * Matches when a tournament exists (the global-setup fixtures guarantee one).
 diff --git a/e2e/manage.spec.ts b/e2e/manage.spec.ts
-index fffd848..5f883fb 100644
+index fffd848..051656c 100644
 --- a/e2e/manage.spec.ts
 +++ b/e2e/manage.spec.ts
 @@ -1,5 +1,5 @@
  import { test, expect } from '@playwright/test'
 -import { apiToken, authHeaders, supabaseAnonKey, supabaseUrl } from './helpers'
-+import { apiToken, authHeaders, expandShelf, supabaseAnonKey, supabaseUrl } from './helpers'
++import { apiToken, authHeaders, expandPanels, supabaseAnonKey, supabaseUrl } from './helpers'
  import { TEST_ADMIN_EMAIL, TEST_ADMIN_PASSWORD } from './global-setup'
  
  // Ticket #15: Tournament settings manages the SELECTED tournament (no list).
@@ -260,7 +354,7 @@ index fffd848..5f883fb 100644
  
      // Active fell back to another tournament: Default's lineup (Alpha) is visible.
      await page.goto('/admin/lineups')
-+    await expandShelf(page)
++    await expandPanels(page)
      await expect(page.getByText('Alpha').first()).toBeVisible()
    })
  })
@@ -280,13 +374,13 @@ index 99d3d05..803c1ae 100644
    })
  })
 diff --git a/e2e/results.spec.ts b/e2e/results.spec.ts
-index 683562e..0d3e47a 100644
+index 683562e..f9485e1 100644
 --- a/e2e/results.spec.ts
 +++ b/e2e/results.spec.ts
 @@ -1,5 +1,5 @@
  import { test, expect, type APIRequestContext, type Page } from '@playwright/test'
 -import { apiToken, authHeaders, supabaseAnonKey, supabaseUrl } from './helpers'
-+import { apiToken, authHeaders, expandShelf, supabaseAnonKey, supabaseUrl } from './helpers'
++import { apiToken, authHeaders, expandPanels, supabaseAnonKey, supabaseUrl } from './helpers'
  import {
    DEFAULT_TOURNAMENT_ID,
    TEST_ADMIN_EMAIL,
@@ -301,7 +395,7 @@ index 683562e..0d3e47a 100644
 -    await expect(gateRow.first()).toBeVisible()
 +    // The entry tie is open; the gate tie is locked (both live far in the
 +    // future — the shelf holds them; expand to reach their cards).
-+    await expandShelf(page)
++    await expandPanels(page)
 +    const gateCard = page
 +      .getByTestId('match-card')
 +      .filter({ hasText: 'E2E Results' })
@@ -347,7 +441,7 @@ index 683562e..0d3e47a 100644
 -      .filter({ hasText: 'Charlie' })
 +    // The fixture tie lives far in the future — outside the working window, so
 +    // it shelves; expand to reach its card.
-+    await expandShelf(page)
++    await expandPanels(page)
 +    const resCard = page
 +      .getByTestId('match-card')
 +      .filter({ hasText: 'Alpha vs Charlie' })
@@ -366,7 +460,7 @@ index 683562e..0d3e47a 100644
 -    await expect(page.getByText(/Decided · Charlie/).first()).toBeVisible()
 +    // The derived winner recomputed: Alpha's r1 flip makes it Charlie 2–1 —
 +    // the card shows the winner and the new tally without any reload.
-+    await expandShelf(page)
++    await expandPanels(page)
 +    const updated = page
 +      .getByTestId('match-card')
 +      .filter({ hasText: 'Alpha vs Charlie' })
@@ -387,7 +481,7 @@ index 683562e..0d3e47a 100644
 -    const gateRow = page.locator('tr, li').filter({ hasText: 'lineup not submitted' })
 -    await expect(gateRow.first()).toBeVisible()
 -    await expect(gateRow.first().getByRole('button', { name: /enter results/i })).toHaveCount(0)
-+    await expandShelf(page)
++    await expandPanels(page)
 +    const gateCard = page
 +      .getByTestId('match-card')
 +      .filter({ hasText: 'E2E Results' })
@@ -398,13 +492,13 @@ index 683562e..0d3e47a 100644
      // Server: a direct write as the umpire is refused and nothing persists.
      const umpire = await signIn(request, UMPIRE_EMAIL, UMPIRE_NEW_PASSWORD)
 diff --git a/e2e/tournament.spec.ts b/e2e/tournament.spec.ts
-index 8c99438..f0a68b1 100644
+index 8c99438..f830ffd 100644
 --- a/e2e/tournament.spec.ts
 +++ b/e2e/tournament.spec.ts
 @@ -1,5 +1,5 @@
  import { test, expect } from '@playwright/test'
 -import { apiToken, authHeaders, supabaseUrl } from './helpers'
-+import { apiToken, authHeaders, expandShelf, supabaseUrl } from './helpers'
++import { apiToken, authHeaders, expandPanels, supabaseUrl } from './helpers'
  import { TEST_ADMIN_EMAIL, TEST_ADMIN_PASSWORD, TEST_MANAGER2_EMAIL, TEST_MANAGER2_NEW_PASSWORD } from './global-setup'
  
  // Ticket #13: the app is tournament-aware. The administrator switches tournament from
@@ -412,16 +506,16 @@ index 8c99438..f0a68b1 100644
  
      await page.goto('/admin/lineups')
      // "Default" holds the global-setup fixture (Alpha has a submitted lineup).
-+    await expandShelf(page)
++    await expandPanels(page)
      await expect(page.getByText('Alpha').first()).toBeVisible()
  
      // Switch to the other tournament — its lineups view re-scopes to empty.
 diff --git a/e2e/venue-ux.spec.ts b/e2e/venue-ux.spec.ts
 new file mode 100644
-index 0000000..90df0ef
+index 0000000..c5aa7f8
 --- /dev/null
 +++ b/e2e/venue-ux.spec.ts
-@@ -0,0 +1,270 @@
+@@ -0,0 +1,287 @@
 +import { test, expect } from '@playwright/test'
 +import { apiToken, authHeaders, supabaseUrl } from './helpers'
 +import {
@@ -433,14 +527,14 @@ index 0000000..90df0ef
 +
 +// venue-ux — the feature-acceptance E2E.
 +//
-+// Scenario 1: five-match team matches across four timeslots (09:00, 10:30,
-+// 13:30, 16:00) and a day-two tie; with the device clock pinned to 11:20 the
-+// umpire console shows exactly the 10:30/13:30/16:00 window, the decided
-+// 10:30 match dimmed in place with its 3–1 tally, and everything else under
-+// the collapsed Shelved panel (counted, reachable by search).
++// Scenario 1: five-match team matches across four timeslots (one in the past,
++// the current slot started 5 minutes ago, two coming up) and a day-two tie;
++// the umpire console shows exactly the current + next-two window, the decided
++// current-slot match dimmed in place with its 3–1 tally, and everything else
++// under the collapsed Past and Future panels (counted, reachable by search).
 +//
 +// Scenario 2: a lineups-pending card flips to ready within one 20s poll,
-+// without a reload (the clock fast-forwards the poll timer).
++// without a reload (the clock fast-forwards the poll timer from real now).
 +//
 +// Scenario 3: the dark theme toggle persists across a reload.
 +//
@@ -451,15 +545,24 @@ index 0000000..90df0ef
 +test.use({ timezoneId: 'UTC' })
 +
 +const CAT = 'e2e-ux-cat'
-+// Day-one slots on today's UTC date; the fake clock reads 11:20 today.
-+const DAY = new Date().toISOString().slice(0, 10)
-+const at = (hhmm: string): string => `${DAY}T${hhmm}:00+00:00`
-+const T0900 = 'e2e-ux-t0900'
-+const T1030 = 'e2e-ux-t1030'
-+const T1330 = 'e2e-ux-t1330'
-+const T1600 = 'e2e-ux-t1600'
-+const DAY2 = 'e2e-ux-day2'
-+const NOW = new Date(`${DAY}T11:20:00Z`)
++// Fixture times derive from the REAL clock — never fake the wall clock (a fake
++// far from the session's JWT expiry kills the auth session). Offsets: a slot
++// an hour ago (Past), one started 5 minutes ago (current, decided 3–1), and
++// two coming up (+2h, +4h) filling the lookahead window, plus a day-two tie
++// that must always land in Future.
++const iso = (offsetMs: number): string => new Date(Date.now() + offsetMs).toISOString()
++const HOUR = 3600 * 1000
++const T0900 = 'e2e-ux-t0900' // past slot (started an hour ago)
++const T1030 = 'e2e-ux-t1030' // current slot (started 5 min ago) — DECIDED 3–1
++const T1330 = 'e2e-ux-t1330' // +2h — lineups pending, scenario 2's flip target
++const T1600 = 'e2e-ux-t1600' // +4h — pending filler in the window
++const DAY2 = 'e2e-ux-day2' // tomorrow 09:00 — must always sit in Future
++const tomorrow0900 = (() => {
++  const d = new Date()
++  d.setUTCDate(d.getUTCDate() + 1)
++  d.setUTCHours(9, 0, 0, 0)
++  return d.toISOString()
++})()
 +
 +const ALPHA_GAMES = [
 +  { a: 11, b: 5 },
@@ -511,11 +614,11 @@ index 0000000..90df0ef
 +    }
 +  ])
 +  await post('ties', [
-+    { id: T0900, tournament_id: 'default', category_id: CAT, scheduled_start: at('09:00'), table_label: '1', team_a: 'e2e-a', team_b: 'e2e-b', is_knockout: false },
-+    { id: T1030, tournament_id: 'default', category_id: CAT, scheduled_start: at('10:30'), table_label: '2', team_a: 'e2e-a', team_b: 'e2e-c', is_knockout: false },
-+    { id: T1330, tournament_id: 'default', category_id: CAT, scheduled_start: at('13:30'), table_label: '3', team_a: 'e2e-a', team_b: 'e2e-b', is_knockout: false },
-+    { id: T1600, tournament_id: 'default', category_id: CAT, scheduled_start: at('16:00'), table_label: '4', team_a: 'e2e-b', team_b: 'e2e-c', is_knockout: false },
-+    { id: DAY2, tournament_id: 'default', category_id: CAT, scheduled_start: `${DAY.slice(0, 8)}${String(+DAY.slice(8) + 1).padStart(2, '0')}T09:00:00+00:00`, table_label: '1', team_a: 'e2e-ka', team_b: 'e2e-kb', is_knockout: false }
++    { id: T0900, tournament_id: 'default', category_id: CAT, scheduled_start: iso(-HOUR), table_label: '1', team_a: 'e2e-a', team_b: 'e2e-b', is_knockout: false },
++    { id: T1030, tournament_id: 'default', category_id: CAT, scheduled_start: iso(-5 * 60 * 1000), table_label: '2', team_a: 'e2e-a', team_b: 'e2e-c', is_knockout: false },
++    { id: T1330, tournament_id: 'default', category_id: CAT, scheduled_start: iso(2 * HOUR), table_label: '3', team_a: 'e2e-a', team_b: 'e2e-b', is_knockout: false },
++    { id: T1600, tournament_id: 'default', category_id: CAT, scheduled_start: iso(4 * HOUR), table_label: '4', team_a: 'e2e-b', team_b: 'e2e-c', is_knockout: false },
++    { id: DAY2, tournament_id: 'default', category_id: CAT, scheduled_start: tomorrow0900, table_label: '1', team_a: 'e2e-ka', team_b: 'e2e-kb', is_knockout: false }
 +  ])
 +  // The 10:30 team match is DECIDED 3–1 (Alpha): four rubbers stored, r5 absent.
 +  // Both lineups are submitted — the entry gate must be satisfied for the
@@ -564,7 +667,6 @@ index 0000000..90df0ef
 +  test('scenario 1: timeslot window, decided-in-place, shelved panel reachable by search', async ({
 +    page
 +  }) => {
-+    await page.clock.install({ time: NOW })
 +    await page.goto('/login')
 +    await page.getByRole('textbox', { name: /email/i }).fill(TEST_UMPIRE_EMAIL)
 +    await page.getByRole('textbox', { name: /password/i }).fill(TEST_UMPIRE_NEW_PASSWORD)
@@ -572,12 +674,15 @@ index 0000000..90df0ef
 +    await expect(page).toHaveURL(/\/umpire$/)
 +
 +    const windowPanel = page.getByTestId('window')
-+    const shelf = page.getByTestId('shelf')
++    const pastPanel = page.getByTestId('past-panel')
++    const futurePanel = page.getByTestId('future-panel')
 +
-+    // The window shows exactly the 10:30 / 13:30 / 16:00 slots, in time order.
-+    await expect(windowPanel.getByText('10:30', { exact: true })).toBeVisible()
-+    await expect(windowPanel.getByText('13:30', { exact: true })).toBeVisible()
-+    await expect(windowPanel.getByText('16:00', { exact: true })).toBeVisible()
++    // The window shows exactly the current (started 5 min ago) and the two
++    // coming slots, the current one tagged Now.
++    await expect(windowPanel.getByText('Now', { exact: true })).toBeVisible()
++    await expect(
++      windowPanel.getByTestId('match-card').filter({ hasText: 'E2E Venue UX' })
++    ).toHaveCount(3)
 +
 +    // The decided 10:30 team match stays visible, dimmed, with its tally.
 +    const decidedCard = windowPanel
@@ -592,19 +697,26 @@ index 0000000..90df0ef
 +      windowPanel.getByTestId('match-card').filter({ hasText: 'E2E Venue UX' })
 +    ).toHaveCount(3)
 +
-+    // Shelved panel: collapsed, showing a count (this shared tournament has
-+    // other fixtures too — assert the count format, not a pinned number), and
-+    // no cards rendered.
-+    await expect(shelf.getByText(/Shelved/)).toContainText(/matches/)
-+    await expect(shelf.getByTestId('match-card')).toHaveCount(0)
++    // Past and Future panels: collapsed, each showing a count (this shared
++    // tournament has other fixtures too — assert the count format, not a
++    // pinned number), and no cards rendered.
++    await expect(pastPanel.getByText(/Past/)).toContainText(/match/)
++    await expect(futurePanel.getByText(/Future/)).toContainText(/match/)
++    await expect(pastPanel.getByTestId('match-card')).toHaveCount(0)
++    await expect(futurePanel.getByTestId('match-card')).toHaveCount(0)
 +
-+    // Expanding reveals the shelved fixture matches (09:00 today + day two).
-+    await shelf.getByRole('button', { name: /shelved/i }).click()
++    // Expanding reveals the fixture matches in their group: the 09:00 slot is
++    // past (earlier today), the day-two match is future.
++    await pastPanel.getByRole('button').click()
++    await futurePanel.getByRole('button').click()
 +    await expect(
-+      shelf.getByTestId('match-card').filter({ hasText: 'E2E Venue UX' })
-+    ).toHaveCount(2)
++      pastPanel.getByTestId('match-card').filter({ hasText: 'E2E Venue UX' })
++    ).toHaveCount(1)
++    await expect(
++      futurePanel.getByTestId('match-card').filter({ hasText: 'E2E Venue UX' })
++    ).toHaveCount(1)
 +
-+    // Search reaches the shelf: only the day-two Kilo match remains anywhere.
++    // Search reaches both groups: only the day-two Kilo match remains anywhere.
 +    await page.getByRole('textbox', { name: /search player/i }).fill('Kilo')
 +    await expect(
 +      page
@@ -633,7 +745,7 @@ index 0000000..90df0ef
 +    )
 +    expect(reset.ok()).toBeTruthy()
 +
-+    await page.clock.install({ time: NOW })
++    await page.clock.install()
 +    await page.goto('/login')
 +    await page.getByRole('textbox', { name: /email/i }).fill(TEST_UMPIRE_EMAIL)
 +    await page.getByRole('textbox', { name: /password/i }).fill(TEST_UMPIRE_NEW_PASSWORD)
@@ -676,7 +788,6 @@ index 0000000..90df0ef
 +  })
 +
 +  test('scenario 3: the dark theme persists across a reload', async ({ page }) => {
-+    await page.clock.install({ time: NOW })
 +    await page.goto('/login')
 +    await page.getByRole('textbox', { name: /email/i }).fill(TEST_UMPIRE_EMAIL)
 +    await page.getByRole('textbox', { name: /password/i }).fill(TEST_UMPIRE_NEW_PASSWORD)
@@ -692,6 +803,77 @@ index 0000000..90df0ef
 +    await expect(page).toHaveURL(/\/umpire$/)
 +  })
 +})
+diff --git a/src/components/CollapsibleMatchGroup.vue b/src/components/CollapsibleMatchGroup.vue
+new file mode 100644
+index 0000000..ced2507
+--- /dev/null
++++ b/src/components/CollapsibleMatchGroup.vue
+@@ -0,0 +1,65 @@
++<script setup lang="ts">
++// A collapsible group of slot sections under the working window (venue-ux):
++// the Past group (earlier timeslots) and the Future group (beyond the window).
++// Always shows the count; renders its body only when expanded. A labelled
++// disclosure — keyboard-operable, aria-expanded — and the same filters reach
++// inside because the body is just more slot sections.
++import { computed, ref } from 'vue'
++
++const props = defineProps<{
++  /** The group's heading, e.g. Past / Future. */
++  title: string
++  count: number
++  /** One-line caption on the right, e.g. "earlier timeslots". */
++  caption?: string
++}>()
++
++const open = ref(false)
++const countLabel = computed(() =>
++  `${props.count} ${props.count === 1 ? 'match' : 'matches'}`
++)
++</script>
++
++<template>
++  <div class="match-group mt-6">
++    <button
++      type="button"
++      class="group-head"
++      :aria-expanded="open"
++      @click="open = !open"
++    >
++      <v-icon size="small">{{ open ? 'mdi-chevron-down' : 'mdi-chevron-right' }}</v-icon>
++      {{ title }}
++      <v-chip size="x-small" variant="tonal" class="font-weight-bold">{{ countLabel }}</v-chip>
++      <v-spacer />
++      <span v-if="caption" class="text-caption text-medium-emphasis">{{ caption }}</span>
++    </button>
++    <div v-if="open" class="group-body px-3 pb-3">
++      <slot />
++    </div>
++  </div>
++</template>
++
++<style scoped>
++.match-group {
++  border: 1px solid rgba(var(--v-border-color), var(--v-border-opacity));
++  border-radius: 13px;
++  background: rgb(var(--v-theme-surface-raised));
++  overflow: hidden;
++}
++.group-head {
++  width: 100%;
++  display: flex;
++  align-items: center;
++  gap: 8px;
++  padding: 12px 14px;
++  font: inherit;
++  font-size: 14px;
++  font-weight: 700;
++  background: transparent;
++  border: 0;
++  color: rgb(var(--v-theme-on-surface));
++  cursor: pointer;
++  text-align: left;
++}
++</style>
 diff --git a/src/components/MatchCard.vue b/src/components/MatchCard.vue
 new file mode 100644
 index 0000000..ed40280
@@ -856,66 +1038,6 @@ index 0000000..ed40280
 +}
 +.tally {
 +  font-variant-numeric: tabular-nums;
-+}
-+</style>
-diff --git a/src/components/ShelvedPanel.vue b/src/components/ShelvedPanel.vue
-new file mode 100644
-index 0000000..0ef7959
---- /dev/null
-+++ b/src/components/ShelvedPanel.vue
-@@ -0,0 +1,54 @@
-+<script setup lang="ts">
-+// The collapsible shelf for matches outside the working window (venue-ux R5):
-+// always shows the count, renders its body only when expanded. A labelled
-+// disclosure — keyboard-operable, aria-expanded, and the same filters reach
-+// inside because the body is just more slot sections.
-+import { ref } from 'vue'
-+
-+defineProps<{ count: number }>()
-+const open = ref(false)
-+</script>
-+
-+<template>
-+  <div data-testid="shelf" class="shelved-panel mt-6">
-+    <button
-+      type="button"
-+      class="shelf-head"
-+      :aria-expanded="open"
-+      @click="open = !open"
-+    >
-+      <v-icon size="small">{{ open ? 'mdi-chevron-down' : 'mdi-chevron-right' }}</v-icon>
-+      Shelved
-+      <v-chip size="x-small" variant="tonal" class="font-weight-bold">{{ count }} matches</v-chip>
-+      <v-spacer />
-+      <span class="text-caption text-medium-emphasis">earlier slots &amp; beyond the window</span>
-+    </button>
-+    <div v-if="open" class="shelf-body px-3 pb-3">
-+      <slot />
-+    </div>
-+  </div>
-+</template>
-+
-+<style scoped>
-+.shelved-panel {
-+  border: 1px solid rgba(var(--v-border-color), var(--v-border-opacity));
-+  border-radius: 13px;
-+  background: rgb(var(--v-theme-surface-raised));
-+  overflow: hidden;
-+}
-+.shelf-head {
-+  width: 100%;
-+  display: flex;
-+  align-items: center;
-+  gap: 8px;
-+  padding: 12px 14px;
-+  font: inherit;
-+  font-size: 14px;
-+  font-weight: 700;
-+  background: transparent;
-+  border: 0;
-+  color: rgb(var(--v-theme-on-surface));
-+  cursor: pointer;
-+  text-align: left;
 +}
 +</style>
 diff --git a/src/components/SlotSection.vue b/src/components/SlotSection.vue
@@ -1213,10 +1335,10 @@ index d1abeec..bfac0ee 100644
  
 diff --git a/src/domain/__tests__/scheduleWindow.test.ts b/src/domain/__tests__/scheduleWindow.test.ts
 new file mode 100644
-index 0000000..219ff12
+index 0000000..5d75c6f
 --- /dev/null
 +++ b/src/domain/__tests__/scheduleWindow.test.ts
-@@ -0,0 +1,128 @@
+@@ -0,0 +1,139 @@
 +import { describe, it, expect } from 'vitest'
 +import { classifySlots, computeWindow, deriveSlots } from '../scheduleWindow'
 +
@@ -1315,34 +1437,45 @@ index 0000000..219ff12
 +    tie('d', at('16:00'))
 +  ])
 +
-+  it('splits windowed from shelved in slot order', () => {
-+    const { windowed, shelved } = classifySlots(slots, { first: 1, last: 3 })
++  it('splits windowed, past and future in slot order', () => {
++    const { windowed, past, future } = classifySlots(slots, { first: 1, last: 3 })
 +    expect(windowed).toEqual([1, 2, 3])
-+    expect(shelved).toEqual([0])
++    expect(past).toEqual([0])
++    expect(future).toEqual([])
 +  })
 +
-+  it('shelves everything when the window is empty', () => {
-+    const { windowed, shelved } = classifySlots(slots, { first: -1, last: -1 })
++  it('a mid-schedule window has both a past and a future', () => {
++    const { windowed, past, future } = classifySlots(slots, { first: 1, last: 2 })
++    expect(windowed).toEqual([1, 2])
++    expect(past).toEqual([0])
++    expect(future).toEqual([3])
++  })
++
++  it('an empty schedule classifies nothing', () => {
++    const { windowed, past, future } = classifySlots([], { first: -1, last: -1 })
 +    expect(windowed).toEqual([])
-+    expect(shelved).toEqual([0, 1, 2, 3])
++    expect(past).toEqual([])
++    expect(future).toEqual([])
 +  })
 +
-+  it('a full window shelves nothing', () => {
-+    const { windowed, shelved } = classifySlots(slots, { first: 0, last: 3 })
++  it('a full window has no past and no future', () => {
++    const { windowed, past, future } = classifySlots(slots, { first: 0, last: 3 })
 +    expect(windowed).toEqual([0, 1, 2, 3])
-+    expect(shelved).toEqual([])
++    expect(past).toEqual([])
++    expect(future).toEqual([])
 +  })
 +
-+  it('other-day slots are just later slots — they shelve when outside the window', () => {
++  it('other-day slots land in future when outside the window', () => {
 +    const multi = deriveSlots([
 +      tie('a', at('16:00')),
 +      tie('b', at('09:00', '2030-03-15')) // next day
 +    ])
 +    const w = computeWindow(multi, new Date(at('16:30')))
 +    expect(w).toEqual({ first: 0, last: 0 })
-+    const { windowed, shelved } = classifySlots(multi, w)
++    const { windowed, past, future } = classifySlots(multi, w)
 +    expect(windowed).toEqual([0])
-+    expect(shelved).toEqual([1])
++    expect(past).toEqual([])
++    expect(future).toEqual([1])
 +  })
 +})
 diff --git a/src/domain/matchesDashboard.ts b/src/domain/matchesDashboard.ts
@@ -1423,10 +1556,10 @@ index 29baa60..7f8d703 100644
  /**
 diff --git a/src/domain/scheduleWindow.ts b/src/domain/scheduleWindow.ts
 new file mode 100644
-index 0000000..d5f9e67
+index 0000000..3c607a2
 --- /dev/null
 +++ b/src/domain/scheduleWindow.ts
-@@ -0,0 +1,134 @@
+@@ -0,0 +1,137 @@
 +// Pure venue-schedule shaping (venue-ux R2/R3): timeslots derived from the
 +// team matches' scheduled starts, and the working window (current slot plus
 +// the next two) that decides what stays on screen versus what shelves.
@@ -1545,21 +1678,24 @@ index 0000000..d5f9e67
 +
 +/**
 + * Classification of the schedule against the window: which slot indexes are in
-+ * the window (rendered up top) and which are shelved (collapsible panel).
-+ * The show-all escape is the view's decision — it skips classification
++ * the window (rendered up top), which are past (earlier timeslots) and which
++ * are future (beyond the window) — the two collapsible groups under the
++ * window. The show-all escape is the view's decision — it skips classification
 + * entirely rather than passing a "full" window. Pure.
 + */
 +export function classifySlots(
 +  slots: ScheduleSlot[],
 +  window: { first: number; last: number }
-+): { windowed: number[]; shelved: number[] } {
++): { windowed: number[]; past: number[]; future: number[] } {
 +  const windowed: number[] = []
-+  const shelved: number[] = []
++  const past: number[] = []
++  const future: number[] = []
 +  slots.forEach((_, i) => {
 +    if (i >= window.first && i <= window.last) windowed.push(i)
-+    else shelved.push(i)
++    else if (i < window.first) past.push(i)
++    else future.push(i)
 +  })
-+  return { windowed, shelved }
++  return { windowed, past, future }
 +}
 diff --git a/src/domain/umpireView.ts b/src/domain/umpireView.ts
 index b5bd90a..c394090 100644
@@ -1842,7 +1978,7 @@ index 03f82ac..cd3c298 100644
        </template>
      </v-app-bar>
 diff --git a/src/views/MatchesView.vue b/src/views/MatchesView.vue
-index b6db920..47ca4f5 100644
+index b6db920..baa7b63 100644
 --- a/src/views/MatchesView.vue
 +++ b/src/views/MatchesView.vue
 @@ -13,15 +13,25 @@ import {
@@ -1867,7 +2003,7 @@ index b6db920..47ca4f5 100644
 +import MatchCard, { type MatchCardTie } from '@/components/MatchCard.vue'
  import MatchStatusChips from '@/components/MatchStatusChips.vue'
 +import SlotSection from '@/components/SlotSection.vue'
-+import ShelvedPanel from '@/components/ShelvedPanel.vue'
++import CollapsibleMatchGroup from '@/components/CollapsibleMatchGroup.vue'
 +import { usePolling } from '@/composables/polling'
 +import AdminResultsDialog from '@/components/AdminResultsDialog.vue'
  
@@ -1885,7 +2021,7 @@ index b6db920..47ca4f5 100644
    resultsTie.value = m
    resultsOpen.value = true
  }
-@@ -112,12 +125,109 @@ const FILTERS: { value: MatchFilter; label: string }[] = [
+@@ -112,12 +125,111 @@ const FILTERS: { value: MatchFilter; label: string }[] = [
    { value: 'past-cutoff', label: 'Past cutoff' }
  ]
  
@@ -1966,7 +2102,7 @@ index b6db920..47ca4f5 100644
 +  const byTie = new Map(matches.value.map((m) => [m.tieId, m]))
 +  const windowIdx = computeWindow(slots, new Date())
 +  const classified = showAll.value
-+    ? { windowed: slots.map((_, i) => i), shelved: [] as number[] }
++    ? { windowed: slots.map((_, i) => i), past: [] as number[], future: [] as number[] }
 +    : classifySlots(slots, windowIdx)
 +
 +  const section = (slotIdx: number, isCurrent: boolean): DashboardSlotRows => {
@@ -1983,8 +2119,10 @@ index b6db920..47ca4f5 100644
 +
 +  return {
 +    windowed: classified.windowed.map((i) => section(i, i === windowIdx.first)),
-+    shelved: classified.shelved.map((i) => section(i, false)),
-+    shelvedCount: classified.shelved.reduce((n, i) => n + (slots[i]?.tieIds.length ?? 0), 0)
++    past: classified.past.map((i) => section(i, false)),
++    future: classified.future.map((i) => section(i, false)),
++    pastCount: classified.past.reduce((n, i) => n + (slots[i]?.tieIds.length ?? 0), 0),
++    futureCount: classified.future.reduce((n, i) => n + (slots[i]?.tieIds.length ?? 0), 0)
 +  }
 +})
 +
@@ -1996,7 +2134,7 @@ index b6db920..47ca4f5 100644
  }
  
  /** group · round metadata parts, shown where the seed provides them. */
-@@ -135,12 +245,14 @@ function metadata(m: MatchRow): string {
+@@ -135,12 +247,14 @@ function metadata(m: MatchRow): string {
  }
  
  async function load(): Promise<void> {
@@ -2013,7 +2151,7 @@ index b6db920..47ca4f5 100644
    }
  }
  
-@@ -206,69 +318,53 @@ onMounted(async () => {
+@@ -206,69 +320,82 @@ onMounted(async () => {
  
        <v-card elevation="2" rounded="lg" class="mt-4">
          <v-card-text>
@@ -2059,7 +2197,7 @@ index b6db920..47ca4f5 100644
 +              </template>
 +              <p v-else class="text-body-2">No team matches in the working window.</p>
 +              <v-btn
-+                v-if="!showAll && slotRows.windowed.length === 0 && slotRows.shelvedCount > 0"
++                v-if="!showAll && slotRows.windowed.length === 0 && slotRows.pastCount + slotRows.futureCount > 0"
 +                variant="tonal"
 +                class="mt-2"
 +                @click="showAll = true"
@@ -2109,9 +2247,15 @@ index b6db920..47ca4f5 100644
 +              </v-btn>
 +            </div>
 +
-+            <ShelvedPanel v-if="slotRows.shelved.length" :count="slotRows.shelvedCount">
++            <CollapsibleMatchGroup
++              v-if="slotRows.past.length"
++              title="Past"
++              data-testid="past-panel"
++              :count="slotRows.pastCount"
++              caption="earlier timeslots"
++            >
 +              <SlotSection
-+                v-for="s in slotRows.shelved"
++                v-for="s in slotRows.past"
 +                :key="s.slotIdx"
 +                :label="s.label"
 +                :day="s.day"
@@ -2124,13 +2268,36 @@ index b6db920..47ca4f5 100644
 +                  @click="selected = c.row"
 +                />
 +              </SlotSection>
-+            </ShelvedPanel>
++            </CollapsibleMatchGroup>
++
++            <CollapsibleMatchGroup
++              v-if="slotRows.future.length"
++              title="Future"
++              data-testid="future-panel"
++              :count="slotRows.futureCount"
++              caption="beyond the working window"
++            >
++              <SlotSection
++                v-for="s in slotRows.future"
++                :key="s.slotIdx"
++                :label="s.label"
++                :day="s.day"
++              >
++                <MatchCard
++                  v-for="c in s.cards"
++                  :key="c.tie.tieId"
++                  :tie="c.tie"
++                  @results="openResults(c.row)"
++                  @click="selected = c.row"
++                />
++              </SlotSection>
++            </CollapsibleMatchGroup>
 +          </div>
            <p v-else class="text-body-2">No team matches for this filter.</p>
          </v-card-text>
        </v-card>
 diff --git a/src/views/UmpireView.vue b/src/views/UmpireView.vue
-index d406e98..a3208de 100644
+index d406e98..9f05a91 100644
 --- a/src/views/UmpireView.vue
 +++ b/src/views/UmpireView.vue
 @@ -8,12 +8,23 @@ import { supabase } from '@/lib/supabase'
@@ -2154,11 +2321,11 @@ index d406e98..a3208de 100644
 +import { usePolling } from '@/composables/polling'
 +import MatchCard, { type MatchCardTie } from '@/components/MatchCard.vue'
 +import SlotSection from '@/components/SlotSection.vue'
-+import ShelvedPanel from '@/components/ShelvedPanel.vue'
++import CollapsibleMatchGroup from '@/components/CollapsibleMatchGroup.vue'
  
  const auth = useAuthStore()
  const rows = ref<UmpireTieRow[]>([])
-@@ -36,8 +47,94 @@ function matchesEvent(r: UmpireTieRow): boolean {
+@@ -36,8 +47,93 @@ function matchesEvent(r: UmpireTieRow): boolean {
    return r.categoryName === categories.value.find((c) => c.id === eventFilter.value)?.name
  }
  
@@ -2208,7 +2375,7 @@ index d406e98..a3208de 100644
 +  const byTie = new Map(rows.value.map((r) => [r.tieId, r]))
 +  const windowIdx = computeWindow(slots, new Date())
 +  const classified = showAll.value
-+    ? { windowed: slots.map((_, i) => i), shelved: [] as number[] }
++    ? { windowed: slots.map((_, i) => i), past: [] as number[], future: [] as number[] }
 +    : classifySlots(slots, windowIdx)
 +
 +  const section = (slotIdx: number, isCurrent: boolean): SlotRows => {
@@ -2230,11 +2397,10 @@ index d406e98..a3208de 100644
 +
 +  return {
 +    windowed: classified.windowed.map((i) => section(i, i === windowIdx.first)),
-+    shelved: classified.shelved.map((i) => section(i, false)),
-+    shelvedCount: classified.shelved.reduce(
-+      (n, i) => n + (slots[i]?.tieIds.length ?? 0),
-+      0
-+    )
++    past: classified.past.map((i) => section(i, false)),
++    future: classified.future.map((i) => section(i, false)),
++    pastCount: classified.past.reduce((n, i) => n + (slots[i]?.tieIds.length ?? 0), 0),
++    futureCount: classified.future.reduce((n, i) => n + (slots[i]?.tieIds.length ?? 0), 0)
 +  }
 +})
 +
@@ -2255,7 +2421,7 @@ index d406e98..a3208de 100644
  
  const data = reactive({
    tieTeamIds: new Map<string, [string, string]>(),
-@@ -65,17 +162,12 @@ const entryPlayers = ref<[string[], string[]][]>([])
+@@ -65,17 +161,12 @@ const entryPlayers = ref<[string[], string[]][]>([])
  const entryStored = ref<{ games: GameScore[]; walkover: boolean; walkoverSide: Side | null }[]>([])
  
  function fmt(iso: string | null): string {
@@ -2276,7 +2442,7 @@ index d406e98..a3208de 100644
    const tournamentId = auth.umpireTournamentId
    if (!tournamentId) {
      errorMessage.value = 'This account is not bound to a tournament.'
-@@ -180,8 +272,13 @@ async function load(): Promise<void> {
+@@ -180,8 +271,13 @@ async function load(): Promise<void> {
          walkoverSide: (r.walkover_side as Side | null) ?? undefined
        }))
      })
@@ -2291,7 +2457,7 @@ index d406e98..a3208de 100644
    } finally {
      loading.value = false
    }
-@@ -230,6 +327,9 @@ onMounted(load)
+@@ -230,6 +326,9 @@ onMounted(load)
        <v-card-item>
          <v-card-title>Umpire console</v-card-title>
          <v-card-subtitle v-if="tournamentName">{{ tournamentName }}</v-card-subtitle>
@@ -2301,7 +2467,7 @@ index d406e98..a3208de 100644
        </v-card-item>
        <v-divider />
        <v-card-text>
-@@ -237,9 +337,15 @@ onMounted(load)
+@@ -237,9 +336,15 @@ onMounted(load)
  
          <template v-else>
            <div class="d-flex align-center ga-4 mb-3 flex-wrap">
@@ -2320,7 +2486,7 @@ index d406e98..a3208de 100644
              <v-spacer />
              <v-select
                v-model="eventFilter"
-@@ -253,64 +359,44 @@ onMounted(load)
+@@ -253,64 +358,67 @@ onMounted(load)
              />
            </div>
  
@@ -2356,34 +2522,7 @@ index d406e98..a3208de 100644
 -            </tbody>
 -          </v-table>
 -          <p v-else class="text-body-2">No team matches ready for entry.</p>
-+          <div data-testid="window">
-+            <template v-if="slotRows.windowed.length">
-+              <SlotSection
-+                v-for="s in slotRows.windowed"
-+                :key="s.slotIdx"
-+                :label="s.label"
-+                :day="s.day"
-+                :meta="s.isCurrent ? 'Now' : undefined"
-+              >
-+                <MatchCard
-+                  v-for="r in s.rows"
-+                  :key="r.tieId"
-+                  :tie="cardTie(r)"
-+                  @enter="openEntry(r)"
-+                />
-+              </SlotSection>
-+            </template>
-+            <p v-else class="text-body-2">No team matches in the working window.</p>
-+            <v-btn
-+              v-if="!showAll && slotRows.windowed.length === 0 && slotRows.shelvedCount > 0"
-+              variant="tonal"
-+              class="mt-2"
-+              @click="showAll = true"
-+            >
-+              Show all matches
-+            </v-btn>
-+          </div>
- 
+-
 -          <template v-if="lockedRows.length">
 -            <div class="text-h6 mt-6 mb-2">Waiting for lineups</div>
 -            <v-table density="comfortable">
@@ -2409,16 +2548,67 @@ index d406e98..a3208de 100644
 -              </tbody>
 -            </v-table>
 -          </template>
-+          <ShelvedPanel v-if="slotRows.shelved.length" :count="slotRows.shelvedCount">
++          <div data-testid="window">
++            <template v-if="slotRows.windowed.length">
++              <SlotSection
++                v-for="s in slotRows.windowed"
++                :key="s.slotIdx"
++                :label="s.label"
++                :day="s.day"
++                :meta="s.isCurrent ? 'Now' : undefined"
++              >
++                <MatchCard
++                  v-for="r in s.rows"
++                  :key="r.tieId"
++                  :tie="cardTie(r)"
++                  @enter="openEntry(r)"
++                />
++              </SlotSection>
++            </template>
++            <p v-else class="text-body-2">No team matches in the working window.</p>
++            <v-btn
++              v-if="!showAll && slotRows.windowed.length === 0 && slotRows.pastCount + slotRows.futureCount > 0"
++              variant="tonal"
++              class="mt-2"
++              @click="showAll = true"
++            >
++              Show all matches
++            </v-btn>
++          </div>
++
++          <CollapsibleMatchGroup
++            v-if="slotRows.past.length"
++            title="Past"
++            data-testid="past-panel"
++            :count="slotRows.pastCount"
++            caption="earlier timeslots"
++          >
 +            <SlotSection
-+              v-for="s in slotRows.shelved"
++              v-for="s in slotRows.past"
 +              :key="s.slotIdx"
 +              :label="s.label"
 +              :day="s.day"
 +            >
 +              <MatchCard v-for="r in s.rows" :key="r.tieId" :tie="cardTie(r)" @enter="openEntry(r)" />
 +            </SlotSection>
-+          </ShelvedPanel>
++          </CollapsibleMatchGroup>
++
++          <CollapsibleMatchGroup
++            v-if="slotRows.future.length"
++            title="Future"
++            data-testid="future-panel"
++            :count="slotRows.futureCount"
++            caption="beyond the working window"
++          >
++            <SlotSection
++              v-for="s in slotRows.future"
++              :key="s.slotIdx"
++              :label="s.label"
++              :day="s.day"
++            >
++              <MatchCard v-for="r in s.rows" :key="r.tieId" :tie="cardTie(r)" @enter="openEntry(r)" />
++            </SlotSection>
++          </CollapsibleMatchGroup>
          </template>
        </v-card-text>
      </v-card>
