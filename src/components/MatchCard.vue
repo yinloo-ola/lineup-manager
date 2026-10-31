@@ -161,8 +161,8 @@ function sideLabel(status: string): string {
 }
 .status-rail {
   display: flex;
-  flex-wrap: wrap;
-  column-gap: 10px;
+  flex-direction: column;
+  align-items: flex-start;
   row-gap: 4px;
 }
 .status-rail > span {
