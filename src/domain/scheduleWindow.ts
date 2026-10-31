@@ -116,19 +116,22 @@ export function sortSlotTies<T extends { scheduledStart: string | null; table?: 
 
 /**
  * Classification of the schedule against the window: which slot indexes are in
- * the window (rendered up top) and which are shelved (collapsible panel).
- * The show-all escape is the view's decision — it skips classification
+ * the window (rendered up top), which are past (earlier timeslots) and which
+ * are future (beyond the window) — the two collapsible groups under the
+ * window. The show-all escape is the view's decision — it skips classification
  * entirely rather than passing a "full" window. Pure.
  */
 export function classifySlots(
   slots: ScheduleSlot[],
   window: { first: number; last: number }
-): { windowed: number[]; shelved: number[] } {
+): { windowed: number[]; past: number[]; future: number[] } {
   const windowed: number[] = []
-  const shelved: number[] = []
+  const past: number[] = []
+  const future: number[] = []
   slots.forEach((_, i) => {
     if (i >= window.first && i <= window.last) windowed.push(i)
-    else shelved.push(i)
+    else if (i < window.first) past.push(i)
+    else future.push(i)
   })
-  return { windowed, shelved }
+  return { windowed, past, future }
 }

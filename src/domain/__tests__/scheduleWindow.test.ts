@@ -96,33 +96,44 @@ describe('classifySlots', () => {
     tie('d', at('16:00'))
   ])
 
-  it('splits windowed from shelved in slot order', () => {
-    const { windowed, shelved } = classifySlots(slots, { first: 1, last: 3 })
+  it('splits windowed, past and future in slot order', () => {
+    const { windowed, past, future } = classifySlots(slots, { first: 1, last: 3 })
     expect(windowed).toEqual([1, 2, 3])
-    expect(shelved).toEqual([0])
+    expect(past).toEqual([0])
+    expect(future).toEqual([])
   })
 
-  it('shelves everything when the window is empty', () => {
-    const { windowed, shelved } = classifySlots(slots, { first: -1, last: -1 })
+  it('a mid-schedule window has both a past and a future', () => {
+    const { windowed, past, future } = classifySlots(slots, { first: 1, last: 2 })
+    expect(windowed).toEqual([1, 2])
+    expect(past).toEqual([0])
+    expect(future).toEqual([3])
+  })
+
+  it('an empty schedule classifies nothing', () => {
+    const { windowed, past, future } = classifySlots([], { first: -1, last: -1 })
     expect(windowed).toEqual([])
-    expect(shelved).toEqual([0, 1, 2, 3])
+    expect(past).toEqual([])
+    expect(future).toEqual([])
   })
 
-  it('a full window shelves nothing', () => {
-    const { windowed, shelved } = classifySlots(slots, { first: 0, last: 3 })
+  it('a full window has no past and no future', () => {
+    const { windowed, past, future } = classifySlots(slots, { first: 0, last: 3 })
     expect(windowed).toEqual([0, 1, 2, 3])
-    expect(shelved).toEqual([])
+    expect(past).toEqual([])
+    expect(future).toEqual([])
   })
 
-  it('other-day slots are just later slots — they shelve when outside the window', () => {
+  it('other-day slots land in future when outside the window', () => {
     const multi = deriveSlots([
       tie('a', at('16:00')),
       tie('b', at('09:00', '2030-03-15')) // next day
     ])
     const w = computeWindow(multi, new Date(at('16:30')))
     expect(w).toEqual({ first: 0, last: 0 })
-    const { windowed, shelved } = classifySlots(multi, w)
+    const { windowed, past, future } = classifySlots(multi, w)
     expect(windowed).toEqual([0])
-    expect(shelved).toEqual([1])
+    expect(past).toEqual([])
+    expect(future).toEqual([1])
   })
 })

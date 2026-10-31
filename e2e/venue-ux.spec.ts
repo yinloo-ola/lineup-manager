@@ -9,14 +9,14 @@ import {
 
 // venue-ux — the feature-acceptance E2E.
 //
-// Scenario 1: five-match team matches across four timeslots (09:00, 10:30,
-// 13:30, 16:00) and a day-two tie; with the device clock pinned to 11:20 the
-// umpire console shows exactly the 10:30/13:30/16:00 window, the decided
-// 10:30 match dimmed in place with its 3–1 tally, and everything else under
-// the collapsed Shelved panel (counted, reachable by search).
+// Scenario 1: five-match team matches across four timeslots (one in the past,
+// the current slot started 5 minutes ago, two coming up) and a day-two tie;
+// the umpire console shows exactly the current + next-two window, the decided
+// current-slot match dimmed in place with its 3–1 tally, and everything else
+// under the collapsed Past and Future panels (counted, reachable by search).
 //
 // Scenario 2: a lineups-pending card flips to ready within one 20s poll,
-// without a reload (the clock fast-forwards the poll timer).
+// without a reload (the clock fast-forwards the poll timer from real now).
 //
 // Scenario 3: the dark theme toggle persists across a reload.
 //
@@ -27,15 +27,24 @@ import {
 test.use({ timezoneId: 'UTC' })
 
 const CAT = 'e2e-ux-cat'
-// Day-one slots on today's UTC date; the fake clock reads 11:20 today.
-const DAY = new Date().toISOString().slice(0, 10)
-const at = (hhmm: string): string => `${DAY}T${hhmm}:00+00:00`
-const T0900 = 'e2e-ux-t0900'
-const T1030 = 'e2e-ux-t1030'
-const T1330 = 'e2e-ux-t1330'
-const T1600 = 'e2e-ux-t1600'
-const DAY2 = 'e2e-ux-day2'
-const NOW = new Date(`${DAY}T11:20:00Z`)
+// Fixture times derive from the REAL clock — never fake the wall clock (a fake
+// far from the session's JWT expiry kills the auth session). Offsets: a slot
+// an hour ago (Past), one started 5 minutes ago (current, decided 3–1), and
+// two coming up (+2h, +4h) filling the lookahead window, plus a day-two tie
+// that must always land in Future.
+const iso = (offsetMs: number): string => new Date(Date.now() + offsetMs).toISOString()
+const HOUR = 3600 * 1000
+const T0900 = 'e2e-ux-t0900' // past slot (started an hour ago)
+const T1030 = 'e2e-ux-t1030' // current slot (started 5 min ago) — DECIDED 3–1
+const T1330 = 'e2e-ux-t1330' // +2h — lineups pending, scenario 2's flip target
+const T1600 = 'e2e-ux-t1600' // +4h — pending filler in the window
+const DAY2 = 'e2e-ux-day2' // tomorrow 09:00 — must always sit in Future
+const tomorrow0900 = (() => {
+  const d = new Date()
+  d.setUTCDate(d.getUTCDate() + 1)
+  d.setUTCHours(9, 0, 0, 0)
+  return d.toISOString()
+})()
 
 const ALPHA_GAMES = [
   { a: 11, b: 5 },
@@ -87,11 +96,11 @@ test.beforeAll(async ({ request }) => {
     }
   ])
   await post('ties', [
-    { id: T0900, tournament_id: 'default', category_id: CAT, scheduled_start: at('09:00'), table_label: '1', team_a: 'e2e-a', team_b: 'e2e-b', is_knockout: false },
-    { id: T1030, tournament_id: 'default', category_id: CAT, scheduled_start: at('10:30'), table_label: '2', team_a: 'e2e-a', team_b: 'e2e-c', is_knockout: false },
-    { id: T1330, tournament_id: 'default', category_id: CAT, scheduled_start: at('13:30'), table_label: '3', team_a: 'e2e-a', team_b: 'e2e-b', is_knockout: false },
-    { id: T1600, tournament_id: 'default', category_id: CAT, scheduled_start: at('16:00'), table_label: '4', team_a: 'e2e-b', team_b: 'e2e-c', is_knockout: false },
-    { id: DAY2, tournament_id: 'default', category_id: CAT, scheduled_start: `${DAY.slice(0, 8)}${String(+DAY.slice(8) + 1).padStart(2, '0')}T09:00:00+00:00`, table_label: '1', team_a: 'e2e-ka', team_b: 'e2e-kb', is_knockout: false }
+    { id: T0900, tournament_id: 'default', category_id: CAT, scheduled_start: iso(-HOUR), table_label: '1', team_a: 'e2e-a', team_b: 'e2e-b', is_knockout: false },
+    { id: T1030, tournament_id: 'default', category_id: CAT, scheduled_start: iso(-5 * 60 * 1000), table_label: '2', team_a: 'e2e-a', team_b: 'e2e-c', is_knockout: false },
+    { id: T1330, tournament_id: 'default', category_id: CAT, scheduled_start: iso(2 * HOUR), table_label: '3', team_a: 'e2e-a', team_b: 'e2e-b', is_knockout: false },
+    { id: T1600, tournament_id: 'default', category_id: CAT, scheduled_start: iso(4 * HOUR), table_label: '4', team_a: 'e2e-b', team_b: 'e2e-c', is_knockout: false },
+    { id: DAY2, tournament_id: 'default', category_id: CAT, scheduled_start: tomorrow0900, table_label: '1', team_a: 'e2e-ka', team_b: 'e2e-kb', is_knockout: false }
   ])
   // The 10:30 team match is DECIDED 3–1 (Alpha): four rubbers stored, r5 absent.
   // Both lineups are submitted — the entry gate must be satisfied for the
@@ -140,7 +149,6 @@ test.describe.serial('venue-ux (feature acceptance)', () => {
   test('scenario 1: timeslot window, decided-in-place, shelved panel reachable by search', async ({
     page
   }) => {
-    await page.clock.install({ time: NOW })
     await page.goto('/login')
     await page.getByRole('textbox', { name: /email/i }).fill(TEST_UMPIRE_EMAIL)
     await page.getByRole('textbox', { name: /password/i }).fill(TEST_UMPIRE_NEW_PASSWORD)
@@ -148,12 +156,15 @@ test.describe.serial('venue-ux (feature acceptance)', () => {
     await expect(page).toHaveURL(/\/umpire$/)
 
     const windowPanel = page.getByTestId('window')
-    const shelf = page.getByTestId('shelf')
+    const pastPanel = page.getByTestId('past-panel')
+    const futurePanel = page.getByTestId('future-panel')
 
-    // The window shows exactly the 10:30 / 13:30 / 16:00 slots, in time order.
-    await expect(windowPanel.getByText('10:30', { exact: true })).toBeVisible()
-    await expect(windowPanel.getByText('13:30', { exact: true })).toBeVisible()
-    await expect(windowPanel.getByText('16:00', { exact: true })).toBeVisible()
+    // The window shows exactly the current (started 5 min ago) and the two
+    // coming slots, the current one tagged Now.
+    await expect(windowPanel.getByText('Now', { exact: true })).toBeVisible()
+    await expect(
+      windowPanel.getByTestId('match-card').filter({ hasText: 'E2E Venue UX' })
+    ).toHaveCount(3)
 
     // The decided 10:30 team match stays visible, dimmed, with its tally.
     const decidedCard = windowPanel
@@ -168,19 +179,26 @@ test.describe.serial('venue-ux (feature acceptance)', () => {
       windowPanel.getByTestId('match-card').filter({ hasText: 'E2E Venue UX' })
     ).toHaveCount(3)
 
-    // Shelved panel: collapsed, showing a count (this shared tournament has
-    // other fixtures too — assert the count format, not a pinned number), and
-    // no cards rendered.
-    await expect(shelf.getByText(/Shelved/)).toContainText(/matches/)
-    await expect(shelf.getByTestId('match-card')).toHaveCount(0)
+    // Past and Future panels: collapsed, each showing a count (this shared
+    // tournament has other fixtures too — assert the count format, not a
+    // pinned number), and no cards rendered.
+    await expect(pastPanel.getByText(/Past/)).toContainText(/match/)
+    await expect(futurePanel.getByText(/Future/)).toContainText(/match/)
+    await expect(pastPanel.getByTestId('match-card')).toHaveCount(0)
+    await expect(futurePanel.getByTestId('match-card')).toHaveCount(0)
 
-    // Expanding reveals the shelved fixture matches (09:00 today + day two).
-    await shelf.getByRole('button', { name: /shelved/i }).click()
+    // Expanding reveals the fixture matches in their group: the 09:00 slot is
+    // past (earlier today), the day-two match is future.
+    await pastPanel.getByRole('button').click()
+    await futurePanel.getByRole('button').click()
     await expect(
-      shelf.getByTestId('match-card').filter({ hasText: 'E2E Venue UX' })
-    ).toHaveCount(2)
+      pastPanel.getByTestId('match-card').filter({ hasText: 'E2E Venue UX' })
+    ).toHaveCount(1)
+    await expect(
+      futurePanel.getByTestId('match-card').filter({ hasText: 'E2E Venue UX' })
+    ).toHaveCount(1)
 
-    // Search reaches the shelf: only the day-two Kilo match remains anywhere.
+    // Search reaches both groups: only the day-two Kilo match remains anywhere.
     await page.getByRole('textbox', { name: /search player/i }).fill('Kilo')
     await expect(
       page
@@ -209,7 +227,7 @@ test.describe.serial('venue-ux (feature acceptance)', () => {
     )
     expect(reset.ok()).toBeTruthy()
 
-    await page.clock.install({ time: NOW })
+    await page.clock.install()
     await page.goto('/login')
     await page.getByRole('textbox', { name: /email/i }).fill(TEST_UMPIRE_EMAIL)
     await page.getByRole('textbox', { name: /password/i }).fill(TEST_UMPIRE_NEW_PASSWORD)
@@ -252,7 +270,6 @@ test.describe.serial('venue-ux (feature acceptance)', () => {
   })
 
   test('scenario 3: the dark theme persists across a reload', async ({ page }) => {
-    await page.clock.install({ time: NOW })
     await page.goto('/login')
     await page.getByRole('textbox', { name: /email/i }).fill(TEST_UMPIRE_EMAIL)
     await page.getByRole('textbox', { name: /password/i }).fill(TEST_UMPIRE_NEW_PASSWORD)

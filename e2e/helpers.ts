@@ -69,17 +69,19 @@ export async function signInManager(page: Page, email: string, password: string)
 }
 
 /**
- * The venue dashboard shelves matches outside the working window (current
- * timeslot + next two). Fixture ties live far in the future/past, so specs
- * that assert on dashboard cards expand the shelf first.
+ * The venue views group matches outside the working window (current timeslot
+ * + next two) into collapsible Past and Future panels. Fixture ties live far
+ * in the future/past, so specs that assert on cards expand both panels first.
  */
-export async function expandShelf(page: Page): Promise<void> {
-  const head = page.getByTestId('shelf').getByRole('button', { name: /shelved/i })
-  // The dashboard loads asynchronously — give the shelf a moment to render,
-  // but never hang on surfaces that legitimately have none.
-  await head.waitFor({ state: 'visible', timeout: 5000 }).catch(() => {})
-  if ((await head.count()) > 0 && (await head.getAttribute('aria-expanded')) === 'false') {
-    await head.click()
+export async function expandPanels(page: Page): Promise<void> {
+  for (const testId of ['past-panel', 'future-panel']) {
+    const head = page.getByTestId(testId).locator('button.group-head')
+    // The views load asynchronously — give the panels a moment to render,
+    // but never hang on surfaces that legitimately have none.
+    await head.waitFor({ state: 'visible', timeout: 5000 }).catch(() => {})
+    if ((await head.count()) > 0 && (await head.getAttribute('aria-expanded')) === 'false') {
+      await head.click()
+    }
   }
 }
 

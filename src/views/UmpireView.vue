@@ -24,7 +24,7 @@ import ThemeToggle from '@/components/ThemeToggle.vue'
 import { usePolling } from '@/composables/polling'
 import MatchCard, { type MatchCardTie } from '@/components/MatchCard.vue'
 import SlotSection from '@/components/SlotSection.vue'
-import ShelvedPanel from '@/components/ShelvedPanel.vue'
+import CollapsibleMatchGroup from '@/components/CollapsibleMatchGroup.vue'
 
 const auth = useAuthStore()
 const rows = ref<UmpireTieRow[]>([])
@@ -91,7 +91,7 @@ const slotRows = computed(() => {
   const byTie = new Map(rows.value.map((r) => [r.tieId, r]))
   const windowIdx = computeWindow(slots, new Date())
   const classified = showAll.value
-    ? { windowed: slots.map((_, i) => i), shelved: [] as number[] }
+    ? { windowed: slots.map((_, i) => i), past: [] as number[], future: [] as number[] }
     : classifySlots(slots, windowIdx)
 
   const section = (slotIdx: number, isCurrent: boolean): SlotRows => {
@@ -113,11 +113,10 @@ const slotRows = computed(() => {
 
   return {
     windowed: classified.windowed.map((i) => section(i, i === windowIdx.first)),
-    shelved: classified.shelved.map((i) => section(i, false)),
-    shelvedCount: classified.shelved.reduce(
-      (n, i) => n + (slots[i]?.tieIds.length ?? 0),
-      0
-    )
+    past: classified.past.map((i) => section(i, false)),
+    future: classified.future.map((i) => section(i, false)),
+    pastCount: classified.past.reduce((n, i) => n + (slots[i]?.tieIds.length ?? 0), 0),
+    futureCount: classified.future.reduce((n, i) => n + (slots[i]?.tieIds.length ?? 0), 0)
   }
 })
 
@@ -378,7 +377,7 @@ onMounted(load)
             </template>
             <p v-else class="text-body-2">No team matches in the working window.</p>
             <v-btn
-              v-if="!showAll && slotRows.windowed.length === 0 && slotRows.shelvedCount > 0"
+              v-if="!showAll && slotRows.windowed.length === 0 && slotRows.pastCount + slotRows.futureCount > 0"
               variant="tonal"
               class="mt-2"
               @click="showAll = true"
@@ -387,16 +386,39 @@ onMounted(load)
             </v-btn>
           </div>
 
-          <ShelvedPanel v-if="slotRows.shelved.length" :count="slotRows.shelvedCount">
+          <CollapsibleMatchGroup
+            v-if="slotRows.past.length"
+            title="Past"
+            data-testid="past-panel"
+            :count="slotRows.pastCount"
+            caption="earlier timeslots"
+          >
             <SlotSection
-              v-for="s in slotRows.shelved"
+              v-for="s in slotRows.past"
               :key="s.slotIdx"
               :label="s.label"
               :day="s.day"
             >
               <MatchCard v-for="r in s.rows" :key="r.tieId" :tie="cardTie(r)" @enter="openEntry(r)" />
             </SlotSection>
-          </ShelvedPanel>
+          </CollapsibleMatchGroup>
+
+          <CollapsibleMatchGroup
+            v-if="slotRows.future.length"
+            title="Future"
+            data-testid="future-panel"
+            :count="slotRows.futureCount"
+            caption="beyond the working window"
+          >
+            <SlotSection
+              v-for="s in slotRows.future"
+              :key="s.slotIdx"
+              :label="s.label"
+              :day="s.day"
+            >
+              <MatchCard v-for="r in s.rows" :key="r.tieId" :tie="cardTie(r)" @enter="openEntry(r)" />
+            </SlotSection>
+          </CollapsibleMatchGroup>
         </template>
       </v-card-text>
     </v-card>

@@ -1,5 +1,5 @@
 import { test, expect, type APIRequestContext, type Page } from '@playwright/test'
-import { apiToken, authHeaders, expandShelf, supabaseAnonKey, supabaseUrl } from './helpers'
+import { apiToken, authHeaders, expandPanels, supabaseAnonKey, supabaseUrl } from './helpers'
 import {
   DEFAULT_TOURNAMENT_ID,
   TEST_ADMIN_EMAIL,
@@ -213,7 +213,7 @@ test.describe('results entry (feature acceptance)', () => {
 
     // The entry tie is open; the gate tie is locked (both live far in the
     // future — the shelf holds them; expand to reach their cards).
-    await expandShelf(page)
+    await expandPanels(page)
     const gateCard = page
       .getByTestId('match-card')
       .filter({ hasText: 'E2E Results' })
@@ -259,7 +259,7 @@ test.describe('results entry (feature acceptance)', () => {
 
     // The fixture tie lives far in the future — outside the working window, so
     // it shelves; expand to reach its card.
-    await expandShelf(page)
+    await expandPanels(page)
     const resCard = page
       .getByTestId('match-card')
       .filter({ hasText: 'Alpha vs Charlie' })
@@ -283,7 +283,7 @@ test.describe('results entry (feature acceptance)', () => {
 
     // The derived winner recomputed: Alpha's r1 flip makes it Charlie 2–1 —
     // the card shows the winner and the new tally without any reload.
-    await expandShelf(page)
+    await expandPanels(page)
     const updated = page
       .getByTestId('match-card')
       .filter({ hasText: 'Alpha vs Charlie' })
@@ -300,7 +300,7 @@ test.describe('results entry (feature acceptance)', () => {
     // UI: the umpire console shelves the gate tie (lineups pending) with no
     // entry button to press.
     await signInUmpire(page)
-    await expandShelf(page)
+    await expandPanels(page)
     const gateCard = page
       .getByTestId('match-card')
       .filter({ hasText: 'E2E Results' })
