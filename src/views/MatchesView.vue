@@ -83,6 +83,22 @@ const resultsOpen = ref(false)
 const resultsEligible = (m: MatchRow): boolean =>
   !m.isKnockout && m.sides.every((s) => s.teamId !== null)
 
+/** Side display names per rubber, from the submitted lineups (the who-played
+ *  source of truth) — used for the admin dialog's score-column headers. */
+const resultsPlayers = computed<[string[], string[]][] | undefined>(() => {
+  if (!resultsTie.value) return undefined
+  const ctx = resultContexts.value.get(resultsTie.value.tieId)
+  if (!ctx) return undefined
+  const roster = rosterByTeam.value
+  const nameOf = (id: string | null): string => (id ? (roster.get(id) ?? []).find((p) => p.id === id)?.name ?? id : '—')
+  const names = (ids: (string[] | null) | (string[] | null) | undefined): string[] =>
+    (Array.isArray(ids) ? ids : []).map((id) => (id ? nameOf(id) : '—')) as string[]
+  return Array.from({ length: ctx.rubberCount }, (_, i) => [
+    names(ctx.prefill[0][i]),
+    names(ctx.prefill[1][i])
+  ]) as [string[], string[]][]
+})
+
 async function openResults(m: MatchRow): Promise<void> {
   // The dialog renders from the loaded contexts; under a cold parallel load
   // they may not be in yet — fetch before opening rather than showing a shell.
@@ -529,8 +545,7 @@ onMounted(async () => {
       :best-of="resultsTie ? resultContexts.get(resultsTie.tieId)?.bestOf ?? 5 : 5"
       :rubber-count="resultsTie ? resultContexts.get(resultsTie.tieId)?.rubberCount ?? 0 : 0"
       :context="resultsTie ? resultContexts.get(resultsTie.tieId) ?? null : null"
-      :roster-a="resultsTie?.sides[0].teamId ? rosterByTeam.get(resultsTie.sides[0].teamId) ?? [] : []"
-      :roster-b="resultsTie?.sides[1].teamId ? rosterByTeam.get(resultsTie.sides[1].teamId) ?? [] : []"
+      :players="resultsPlayers"
       @saved="onResultsSaved"
     />
   </v-container>

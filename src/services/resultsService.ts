@@ -48,8 +48,6 @@ export async function saveRubberResult(
   input: {
     tieId: string
     rubberIndex: number
-    /** Per-side player id arrays (admin override — umpires ride the RPC). */
-    playerIds: [unknown, unknown]
     games: GameScore[]
     walkover: boolean
     walkoverSide?: Side | null
@@ -88,23 +86,30 @@ export async function saveRubberResult(
 
   const lineupsRes = await client
     .from('lineups')
-    .select('team_id, status')
+    .select('team_id, status, player_ids')
     .eq('tie_id', input.tieId)
   if (lineupsRes.error) throw lineupsRes.error
-  const lineups = ((lineupsRes.data as { team_id: string; status: string }[]) ?? []).map((l) => ({
+  const lineups = ((lineupsRes.data as { team_id: string; status: string; player_ids: (string[] | null)[] | null }[]) ?? []).map((l) => ({
     teamId: l.team_id,
-    status: parseStatus(l.status) as LineupStatus
+    status: parseStatus(l.status) as LineupStatus,
+    playerIds: l.player_ids ?? []
   }))
   if (!bothLineupsSubmitted(lineups, [tie.team_a, tie.team_b])) {
     throw new ResultEntryError('Both lineups must be submitted before results can be entered.')
   }
+
+  // Player identity rides on the submitted lineups — the same rule the umpire
+  // RPC enforces. The lineup is the single source of truth for who played;
+  // a substitution is corrected in the lineup, never in the results.
+  const playersOf = (teamId: string | null): unknown =>
+    lineups.find((l) => l.teamId === teamId)?.playerIds[input.rubberIndex - 1] ?? null
 
   const { error } = await client.from('rubber_results').upsert(
     {
       tournament_id: tie.tournament_id,
       tie_id: input.tieId,
       rubber_index: input.rubberIndex,
-      player_ids: input.playerIds,
+      player_ids: [playersOf(tie.team_a), playersOf(tie.team_b)],
       games: input.games,
       walkover: input.walkover,
       walkover_side: input.walkover ? (input.walkoverSide ?? null) : null

@@ -276,13 +276,13 @@ test.describe('results entry (feature acceptance)', () => {
         .getByRole('spinbutton', { name: `Match 1 game ${game + 1} side B` })
         .fill(String(b))
     }
-    await dlg.getByLabel('Match 1 side A player').click({ force: true })
-    await page.getByRole('option', { name: 'Adam', exact: true }).last().click()
     await dlg.getByRole('button', { name: /save results/i }).click()
     await expect(dlg).not.toBeVisible()
 
     // The derived winner recomputed: Alpha's r1 flip makes it Charlie 2–1 —
-    // the card shows the winner and the new tally without any reload.
+    // the card shows the winner and the new tally without any reload. (Player
+    // identity is no longer editable here — the lineup is the who-played
+    // source of truth; corrections happen in the lineup builder.)
     await expandPanels(page)
     const updated = page
       .getByTestId('match-card')

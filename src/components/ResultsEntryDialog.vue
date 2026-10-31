@@ -28,13 +28,7 @@ interface StoredRubber {
   walkoverSide: Side | null
 }
 
-interface EditPlayer {
-  id: string | null
-}
-
 interface EditRubber {
-  playersA: EditPlayer[]
-  playersB: EditPlayer[]
   games: EntryGame[]
   walkover: boolean
   walkoverSide: Side | null
@@ -49,14 +43,13 @@ const props = defineProps<{
   teamBName: string
   bestOf: number
   rubberCount: number
-  /** Display names per side per rubber (umpire) — pre-filled from lineups. */
+  /** Side display names per rubber — always derived from the submitted
+   *  lineups, the single source of truth for who played. */
   players?: [string[], string[]][]
   /** Stored rows to preload (umpire variant). */
   stored?: StoredRubber[]
   /** Admin: everything the dialog needs, from loadTieResultContexts. */
   context?: TieResultContext | null
-  rosterA?: { id: string; name: string }[]
-  rosterB?: { id: string; name: string }[]
 }>()
 
 const emit = defineEmits<{
@@ -96,11 +89,7 @@ watch(
         const prefillA = ctx.prefill[0][i]
         const prefillB = ctx.prefill[1][i]
         const hasStored = stored != null && (stored.games.length > 0 || stored.walkover)
-        const slotsA = (hasStored ? asIdArray(stored.playerIds[0]) : prefillA) ?? []
-        const slotsB = (hasStored ? asIdArray(stored.playerIds[1]) : prefillB) ?? []
         rubbers.push({
-          playersA: slotsA.map((id) => ({ id })),
-          playersB: slotsB.map((id) => ({ id })),
           games: hasStored
             ? stored.games.map((g) => ({ a: String(g.a), b: String(g.b) }))
             : [{ a: '', b: '' }],
@@ -119,8 +108,6 @@ watch(
       const stored = props.stored?.[i]
       const hasStored = stored != null && (stored.games.length > 0 || stored.walkover)
       rubbers.push({
-        playersA: [],
-        playersB: [],
         games: hasStored
           ? stored.games.map((g) => ({ a: String(g.a), b: String(g.b) }))
           : [{ a: '', b: '' }],
@@ -146,10 +133,6 @@ function sideNames(rubber: number, side: 0 | 1): string[] {
 function columnPlayerName(rubber: number, side: 0 | 1): string {
   const names = sideNames(rubber, side)
   return names.length ? names.join(', ') : side === 0 ? props.teamAName : props.teamBName
-}
-
-function rosterFor(side: 0 | 1): { id: string; name: string }[] {
-  return side === 0 ? (props.rosterA ?? []) : (props.rosterB ?? [])
 }
 
 function violationsFor(rubber: number): string[] {
@@ -237,7 +220,6 @@ async function onSave(): Promise<void> {
           await saveRubberResult(supabase, {
             tieId: props.tieId,
             rubberIndex: i + 1,
-            playerIds: [r.playersA.map((p) => p.id), r.playersB.map((p) => p.id)],
             games: r.walkover ? [] : games,
             walkover: r.walkover,
             walkoverSide: r.walkover ? r.walkoverSide : null,
@@ -342,45 +324,11 @@ async function onSave(): Promise<void> {
             <div class="score-grid mt-2">
               <span class="game-label"></span>
               <span class="side-head text-caption text-medium-emphasis">
-                <template v-if="isAdmin">
-                  <v-select
-                    v-for="(p, pi) in r.playersA"
-                    :key="`a${pi}`"
-                    v-model="p.id"
-                    :items="rosterFor(0)"
-                    item-title="name"
-                    item-value="id"
-                    :label="
-                      r.playersA.length > 1
-                        ? `Match ${i + 1} side A player ${pi + 1}`
-                        : `Match ${i + 1} side A player`
-                    "
-                    density="compact"
-                    hide-details
-                  />
-                </template>
-                <template v-else>{{ columnPlayerName(i, 0) }}</template>
+                {{ columnPlayerName(i, 0) }}
               </span>
               <span></span>
               <span class="side-head text-caption text-medium-emphasis">
-                <template v-if="isAdmin">
-                  <v-select
-                    v-for="(p, pi) in r.playersB"
-                    :key="`b${pi}`"
-                    v-model="p.id"
-                    :items="rosterFor(1)"
-                    item-title="name"
-                    item-value="id"
-                    :label="
-                      r.playersB.length > 1
-                        ? `Match ${i + 1} side B player ${pi + 1}`
-                        : `Match ${i + 1} side B player`
-                    "
-                    density="compact"
-                    hide-details
-                  />
-                </template>
-                <template v-else>{{ columnPlayerName(i, 1) }}</template>
+                {{ columnPlayerName(i, 1) }}
               </span>
 
               <template v-for="(g, gi) in r.games" :key="gi">
