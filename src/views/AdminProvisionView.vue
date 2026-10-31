@@ -195,6 +195,17 @@ onMounted(load)
       {{ result.message }}
     </v-alert>
 
+    <v-alert
+      v-if="!tournaments.activeId"
+      type="info"
+      variant="tonal"
+      class="mt-4"
+    >
+      No tournament selected — import a tournament first. Managers and umpires are always bound to
+      one tournament.
+    </v-alert>
+
+    <template v-else>
     <v-card elevation="2" rounded="lg" class="mt-4">
       <v-card-item>
         <v-card-title>Provision managers</v-card-title>
@@ -288,18 +299,29 @@ onMounted(load)
           </tbody>
         </v-table>
         <p v-else class="text-body-2">No umpires provisioned yet.</p>
-        <v-btn class="mt-3" color="primary" variant="tonal" @click="umpireDialog = true">
+        <v-btn
+          class="mt-3"
+          color="primary"
+          variant="tonal"
+          :disabled="!tournaments.activeId"
+          @click="umpireDialog = true"
+        >
           Provision umpire
         </v-btn>
       </v-card-text>
     </v-card>
+
+    </template>
 
     <!-- Umpire provision dialog -->
     <v-dialog :model-value="umpireDialog" max-width="480" @update:model-value="umpireDialog = false">
       <v-card rounded="lg">
         <v-card-item>
           <v-card-title>Provision umpire</v-card-title>
-          <v-card-subtitle>The umpire must change the password on first login.</v-card-subtitle>
+          <v-card-subtitle>
+            Bound to <strong>{{ tournaments.active?.name ?? 'no tournament' }}</strong> · they must
+            change the password on first login.
+          </v-card-subtitle>
         </v-card-item>
         <v-card-text>
           <v-text-field v-model="umpireEmail" label="Umpire email" type="email" autofocus />
