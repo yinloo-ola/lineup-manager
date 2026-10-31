@@ -347,7 +347,7 @@ onMounted(load)
         <div v-if="loading" class="text-body-2">Loading…</div>
 
         <template v-else>
-          <div class="d-flex align-center ga-4 mb-3 flex-wrap">
+          <div class="d-flex align-center ga-4 mb-3 flex-wrap console-toolbar">
             <v-text-field
               v-model="searchQuery"
               prepend-inner-icon="mdi-magnify"
@@ -355,9 +355,9 @@ onMounted(load)
               density="compact"
               hide-details
               clearable
-              style="max-width: 280px"
+              class="search-field"
             />
-            <v-spacer />
+            <v-spacer class="toolbar-spacer" />
             <v-select
               v-model="eventFilter"
               :items="eventOptions"
@@ -366,7 +366,7 @@ onMounted(load)
               label="Team event"
               density="compact"
               hide-details
-              style="max-width: 260px"
+              class="event-select"
             />
           </div>
 
@@ -451,3 +451,30 @@ onMounted(load)
     />
   </v-container>
 </template>
+
+<style scoped>
+/* Phones: stack the toolbar controls full-width instead of squeezing them. */
+@media (max-width: 600px) {
+  .console-toolbar {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+  }
+  .console-toolbar .toolbar-spacer {
+    display: none;
+  }
+  .console-toolbar .search-field,
+  .console-toolbar .event-select {
+    max-width: none;
+    width: 100%;
+    flex: initial;
+  }
+}
+.search-field {
+  max-width: 280px;
+  flex: 1 1 200px;
+}
+.event-select {
+  max-width: 260px;
+}
+</style>
