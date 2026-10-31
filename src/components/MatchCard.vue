@@ -126,9 +126,7 @@ function sideLabel(status: string): string {
       <template v-else-if="tie.state === 'pending'">
         <!-- Waiting state: the gate refuses results anyway — the card's action
              is the detail dialog (chase / fill the lineup on behalf). -->
-        <v-chip size="small" color="warning" variant="tonal" prepend-icon="mdi-hourglass">
-          Lineups pending
-        </v-chip>
+        <v-chip size="small" color="warning" variant="tonal" prepend-icon="mdi-hourglass">Lineups pending</v-chip>
       </template>
 
       <template v-else>
